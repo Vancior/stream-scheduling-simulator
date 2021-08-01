@@ -29,6 +29,9 @@ class Coordinate:
     def __truediv__(self, scalar: float):
         return self.__class__(*[i / scalar for i in self.co])
 
+    def __iter__(self):
+        return iter(self.co)
+
     @classmethod
     def zero(cls):
         return cls(*[0 for _ in range(cls.dim)])

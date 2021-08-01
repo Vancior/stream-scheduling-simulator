@@ -1,12 +1,14 @@
 import logging
 import typing
+import random
 
 import coloredlogs
 from topology import Topology
 
 from vivaldi.coordinate import Coordinate
 
-STEP_WEIGHT = 0.1
+STEP_WEIGHT = 0.05
+STEP_SCALE = 0.05
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level="DEBUG", logger=logger)
@@ -46,7 +48,7 @@ def vivaldi_compute(
         return coords
 
     lat_matrix = get_latency_matrix(topo)
-    err = matrix_error(lat_matrix, coords)
+    err = matrix_error(lat_matrix, coords) / len(coords)
     logger.debug("initial error: {}".format(err))
 
     coords = {k: v for k, v in coords.items()}
@@ -68,10 +70,11 @@ def vivaldi_compute(
                     force += (
                         (coords[ki] - coords[kj]) / abs(coords[ki] - coords[kj]) * e
                     )
-            coords[ki] += force * STEP_WEIGHT
+            coords[ki] += force * (STEP_WEIGHT + STEP_SCALE * random.random())
         # logger.debug({k: str(v) for k, v in coords.items()})
-        err = matrix_error(lat_matrix, coords)
-        logger.debug("iteration #{} error: {}".format(it, err))
+        err = matrix_error(lat_matrix, coords) / len(coords)
+        if it % 100 == 0:
+            logger.debug("iteration #{} error: {}".format(it, err))
         it += 1
 
     return coords
