@@ -44,6 +44,16 @@ class Topology:
     def get_node(self, nid: str) -> Node:
         return self.g.nodes[nid]["node"]
 
+    def get_nodes(self) -> typing.List[Node]:
+        return [self.g.nodes[nid]["node"] for nid in self.g.nodes()]
+
+    def get_hosts(self) -> typing.List[Node]:
+        return [
+            self.g.nodes[nid]["node"]
+            for nid in self.g.nodes()
+            if self.g.nodes[nid]["type"] == "host"
+        ]
+
     def get_n2n_intrinsic_latency(self, n1: str, n2: str) -> int:
         """NOTE: shortest path is used"""
         if n1 == n2:

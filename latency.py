@@ -1,4 +1,3 @@
-import logging
 import typing
 
 from execution_graph import ExecutionGraph
