@@ -1,4 +1,5 @@
 import enum
+from functools import partial
 import random
 from abc import ABC, abstractmethod
 
@@ -60,10 +61,18 @@ class RandomScheduler(Scheduler):
     ) -> SchedulingResult:
         result = SchedulingResult()
         for v in execution_graph.topological_order():
-            node_list = topology.filter_node_by_memory(v.memory)
-            if len(node_list) == 0:
+            nid_list = list(
+                filter(
+                    partial(topology.memory_filter, v.memory),
+                    filter(
+                        partial(topology.label_filter, v.domain_constraint),
+                        [h.uuid for h in topology.get_hosts()],
+                    ),
+                )
+            )
+            if len(nid_list) == 0:
                 return SchedulingResult.failed()
-            n = random.choice(node_list)
-            self.logger.debug("Select node %s for vertex %s", n.uuid, v.uuid)
-            result.assign(n.uuid, v.uuid)
+            nid = random.choice(nid_list)
+            self.logger.debug("Select node %s for vertex %s", nid, v.uuid)
+            result.assign(nid, v.uuid)
         return result
