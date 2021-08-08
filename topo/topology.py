@@ -11,6 +11,7 @@ class Node(NamedTuple):
     uuid: str
     type: str
     mips: int
+    cores: int
     memory_total: int
     memory_assigned: int
     memory_used: int
@@ -32,6 +33,7 @@ class Topology:
             n.uuid,
             type=n.type,
             mips=n.mips,
+            cores=n.cores,
             memory_total=n.memory_total,
             memory_assigned=n.memory_assigned,
             memory_used=n.memory_used,
@@ -40,8 +42,40 @@ class Topology:
             node=n,
         )
 
+    def add_nodes_from(self, nodes: typing.Iterable[Node]) -> None:
+        for n in nodes:
+            self.add_node(n)
+
     def connect(self, n1: Node, n2: Node, uuid: str, bd: int, delay: int) -> None:
-        self.g.add_edge(n1.uuid, n2.uuid, uuid=uuid, bd=bd, delay=delay, occupied=0)
+        self.g.add_edge(
+            n1.uuid,
+            n2.uuid,
+            uuid=uuid,
+            bd=bd,
+            delay=delay,
+            occupied=0,
+            link=Link(uuid, bd, delay),
+        )
+
+    def add_link(self, n1: Node, n2: Node, link: Link) -> None:
+        self.g.add_edge(
+            n1.uuid,
+            n2.uuid,
+            uuid=link.uuid,
+            bd=link.bd,
+            delay=link.delay,
+            occupied=0,
+            link=link,
+        )
+
+    def add_links_from(
+        self, links: typing.Iterable[typing.Tuple[Node, Node, Link]]
+    ) -> None:
+        for l in links:
+            self.add_link(l[0], l[1], l[2])
+
+    def get_graph(self):
+        return self.g
 
     def get_node(self, nid: str) -> Node:
         """return a read-only proxy"""
@@ -49,6 +83,15 @@ class Topology:
 
     def get_nodes(self) -> typing.List[Node]:
         return [self.get_node(nid) for nid in self.g.nodes()]
+
+    def get_link(self, e: str) -> Link:
+        return self.g.edges[e]["link"]
+
+    def get_links(self) -> typing.List[typing.Tuple[Node, Node, Link]]:
+        return [
+            (self.get_node(e[0]), self.get_node(e[1]), self.get_link(e))
+            for e in self.g.edges()
+        ]
 
     def get_hosts(self) -> typing.List[Node]:
         return [

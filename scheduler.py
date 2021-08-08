@@ -4,7 +4,7 @@ import random
 from abc import ABC, abstractmethod
 
 from execution_graph import ExecutionGraph
-from topology import Topology
+from topo import Topology
 from utils import get_logger
 
 

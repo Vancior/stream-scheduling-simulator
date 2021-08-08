@@ -1,9 +1,10 @@
 import logging
-import typing
 import random
+import typing
 
 import coloredlogs
-from topology import Topology
+from topo import Node, Topology
+from tqdm import trange
 
 from vivaldi.coordinate import Coordinate
 
@@ -14,14 +15,13 @@ logger = logging.getLogger(__name__)
 coloredlogs.install(level="DEBUG", logger=logger)
 
 
-def get_latency_matrix(topo: Topology) -> typing.Dict[str, typing.Dict[str, float]]:
-    node_list = topo.get_hosts()
-    latency_matrix = {n.uuid: dict() for n in node_list}
-    for i in node_list:
-        for j in node_list:
-            latency_matrix[i.uuid][j.uuid] = topo.get_n2n_intrinsic_latency(
-                i.uuid, j.uuid
-            )
+def get_latency_matrix(
+    topo: Topology, nids: typing.List[str]
+) -> typing.Dict[str, typing.Dict[str, float]]:
+    latency_matrix = {n: dict() for n in nids}
+    for i in nids:
+        for j in nids:
+            latency_matrix[i][j] = topo.get_n2n_intrinsic_latency(i, j)
     return latency_matrix
 
 
@@ -31,11 +31,12 @@ def matrix_error(
 ) -> float:
     total = 0
     keys = list(coords.keys())
+    cnt = len(keys) * (len(keys) - 1) / 2
     for i in range(len(keys)):
         for j in range(i + 1, len(keys)):
             err = matrix[keys[i]][keys[j]] - abs(coords[keys[i]] - coords[keys[j]])
             total += err * err
-    return total
+    return total / cnt
 
 
 def vivaldi_compute(
@@ -47,14 +48,18 @@ def vivaldi_compute(
     if len(coords) == 0:
         return coords
 
-    lat_matrix = get_latency_matrix(topo)
+    lat_matrix = get_latency_matrix(topo, list(coords.keys()))
     err = matrix_error(lat_matrix, coords) / len(coords)
-    logger.debug("initial error: {}".format(err))
+    logger.debug("initial error: {:.3f}".format(err))
 
     coords = {k: v for k, v in coords.items()}
     keys = list(coords.keys())
     it = 0
-    while it < max_iteration and err > max_tolerance:
+
+    t_range = trange(max_iteration)
+    for _ in t_range:
+        if err <= max_tolerance:
+            break
         for i in range(len(keys)):
             ki = keys[i]
             force = coords[ki].zero()
@@ -72,9 +77,7 @@ def vivaldi_compute(
                     )
             coords[ki] += force * (STEP_WEIGHT + STEP_SCALE * random.random())
         # logger.debug({k: str(v) for k, v in coords.items()})
-        err = matrix_error(lat_matrix, coords) / len(coords)
-        if it % 100 == 0:
-            logger.debug("iteration #{} error: {}".format(it, err))
-        it += 1
+        err = matrix_error(lat_matrix, coords)
+        t_range.set_description("error: {:.3f}".format(err))
 
     return coords
