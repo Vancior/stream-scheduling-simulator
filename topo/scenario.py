@@ -23,10 +23,16 @@ class Scenario:
                 self.topo.connect(
                     self.domains[i].router.node,
                     self.domains[j].router.node,
-                    uuid.uuid4(),
+                    str(uuid.uuid4())[:8],
                     self.bd,
                     self.delay,
                 )
+
+    def get_edge_domains(self) -> typing.List[Domain]:
+        return [d for d in self.domains if d.type == "edge"]
+
+    def get_cloud_domains(self) -> typing.List[Domain]:
+        return [d for d in self.domains if d.type == "cloud"]
 
     @classmethod
     def from_dict(cls, data):
@@ -36,5 +42,5 @@ class Scenario:
         return cls(
             domains,
             int(data["interdomain"]["bd"] * 1e6),
-            int(data["interdomain"]["delay"] * 1000),
+            int(data["interdomain"]["delay"]),
         )

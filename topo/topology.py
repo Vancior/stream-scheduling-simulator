@@ -39,6 +39,7 @@ class Topology:
             memory_used=n.memory_used,
             memory_lock=threading.Lock(),
             labels=n.labels,
+            occupied=0,
             node=n,
         )
 
@@ -112,7 +113,9 @@ class Topology:
             i += 1
         return total
 
-    def get_n2n_transmission_latency(self, n1: str, n2: str, unit_size: int) -> int:
+    def get_n2n_transmission_latency(
+        self, n1: str, n2: str, unit_size: int, bd: int
+    ) -> int:
         if n1 == n2:
             return int(unit_size / LOCAL_BANDWIDTH * 1000)
         path = nx.shortest_path(self.g, n1, n2)
@@ -120,19 +123,38 @@ class Topology:
         i = 0
         while i < len(path) - 1:
             e = self.g.edges[(path[i], path[i + 1])]
-            total += int((unit_size / (e["bd"] / e["occupied"])) * 1000)
+            total += int((unit_size / (e["bd"] / e["occupied"] * bd)) * 1000)
             i += 1
         return total
 
-    def occupy_link(self, n1: str, n2: str):
+    def get_computation_latency(self, nid: str, mi: int) -> int:
+        """
+        return value in ms
+        assume all tasks are executed in single thread
+        """
+        node = self.g.nodes[nid]
+        return int(
+            mi / (min(node["cores"] / node["occupied"], 1) * node["mips"]) * 1000
+        )
+
+    def occupy_node(self, nid: str):
+        self.g.nodes[nid]["occupied"] += 1
+
+    def occupy_link(self, n1: str, n2: str, bd: int):
         """NOTE: shortest path is used"""
         if n1 == n2:
             return
         path = nx.shortest_path(self.g, n1, n2)
         i = 0
         while i < len(path) - 1:
-            self.g.edges[(path[i], path[i + 1])]["occupied"] += 1
+            self.g.edges[(path[i], path[i + 1])]["occupied"] += bd
             i += 1
+
+    def clear_occupied(self):
+        for _, d in self.g.nodes(data=True):
+            d["occupied"] = 0
+        for _, _, d in self.g.edges(data=True):
+            d["occupied"] = 0
 
     def filter_node_by_memory(self, memory_required: int) -> typing.List[Node]:
         ns = []

@@ -20,5 +20,7 @@ class HRG:
 
     @classmethod
     def from_dict(cls, data):
-        hosts = [Host.from_dict(data["spec"]) for _ in range(int(data["replica"]))]
+        hosts = [
+            Host.from_dict(data["spec"], i + 1) for i in range(int(data["replica"]))
+        ]
         return cls(Switch.from_dict(data["switch"]), hosts)

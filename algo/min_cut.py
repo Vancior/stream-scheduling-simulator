@@ -1,4 +1,3 @@
-from logging import disable
 import typing
 from collections import namedtuple
 from typing import NamedTuple
@@ -70,15 +69,15 @@ def min_cut(g: ExecutionGraph):
     nodes = {v.uuid: FlowGraphNode([]) for v in g.get_vertexs()}
     edges = []
     index = 0
-    for e in g.get_edges():
+    for u, v, d in g.get_edges():
         # output_node = g.get_vertex(e[0])
         # bd = int(output_node.out_unit_rate * output_node.out_unit_size)
-        bd = g.get_edge(e[0], e[1])["bd"]
-        edges.append(FlowGraphEdge(e[0], e[1], bd, 0))
-        nodes[e[0]].out_edges.append(index)
+        bd = d["unit_size"] * d["per_second"]
+        edges.append(FlowGraphEdge(u, v, bd, 0))
+        nodes[u].out_edges.append(index)
         index += 1
-        edges.append(FlowGraphEdge(e[1], e[0], 0, 0))
-        nodes[e[1]].out_edges.append(index)
+        edges.append(FlowGraphEdge(v, u, 0, 0))
+        nodes[v].out_edges.append(index)
         index += 1
 
     flow_graph = FlowGraph(nodes, edges)

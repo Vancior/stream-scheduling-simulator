@@ -11,13 +11,14 @@ class Host:
         self.cores = cores
         self.memory = memory
         self.labels = labels
-        self.node = Node(str(uuid.uuid4()), "host", mips, cores, memory, 0, 0, labels)
+        self.node = Node(
+            str(uuid.uuid4())[:8], "host", mips, cores, memory, 0, 0, labels
+        )
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: typing.Dict, host_seq: int):
+        labels = {"host": "{}{}".format(data["prefix"], host_seq)}
+        labels.update(data["labels"])
         return cls(
-            int(data["mips"]),
-            int(data["cores"]),
-            int(data["memory"] * 1e9),
-            data["labels"],
+            int(data["mips"]), int(data["cores"]), int(data["memory"] * 1e9), labels
         )

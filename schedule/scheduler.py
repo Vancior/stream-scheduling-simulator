@@ -1,44 +1,12 @@
-import enum
-from functools import partial
 import random
 from abc import ABC, abstractmethod
+from functools import partial
 
-from execution_graph import ExecutionGraph
+from graph import ExecutionGraph
 from topo import Topology
 from utils import get_logger
 
-
-class SchedulingResultStatus(enum.Enum):
-    SUCCEED = 1
-    FAILED = 2
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class SchedulingResult:
-    status: SchedulingResultStatus
-    assign_map: dict
-    reason: str
-
-    def __init__(self, status=SchedulingResultStatus.SUCCEED, reason="") -> None:
-        self.status = status
-        self.assign_map = {}
-        self.reason = reason
-
-    def failed(cls, reason: str):
-        return SchedulingResult(status=SchedulingResultStatus.FAILED, reason=reason)
-
-    def __str__(self) -> str:
-        if self.status == SchedulingResultStatus.SUCCEED:
-            return self.assign_map.__str__()
-        return {"status": self.status.__str__(), "reason": self.reason}
-
-    def assign(self, nid: str, vid: str):
-        self.assign_map[vid] = nid
-
-    def get_scheduled_node(self, vid: str):
-        return self.assign_map.get(vid)
+from .result import SchedulingResult
 
 
 class Scheduler(ABC):
@@ -71,7 +39,7 @@ class RandomScheduler(Scheduler):
                 )
             )
             if len(nid_list) == 0:
-                return SchedulingResult.failed()
+                return SchedulingResult.failed("no available host")
             nid = random.choice(nid_list)
             self.logger.debug("Select node %s for vertex %s", nid, v.uuid)
             result.assign(nid, v.uuid)
