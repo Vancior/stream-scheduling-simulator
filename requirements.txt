@@ -1,3 +1,6 @@
 blackcellmagic
 coloredlogs
+networkx
 notebook
+numpy
+pyyaml

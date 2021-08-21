@@ -87,12 +87,20 @@ class GraphGenerator:
                 self.gen_args["memory_cb"](),
             )
             g.add_vertex(v)
-            g.connect(
-                last_vertex,
-                v,
-                self.gen_args["unit_size_cb"](),
-                self.gen_args["unit_rate_cb"](),
-            )
+            if last_vertex == v_source:
+                g.connect(
+                    last_vertex,
+                    v,
+                    self.gen_args["unit_size_cb"](),
+                    self.gen_args["unit_rate_cb"]() + self.gen_args["unit_rate_cb"](),
+                )
+            else:
+                g.connect(
+                    last_vertex,
+                    v,
+                    self.gen_args["unit_size_cb"](),
+                    self.gen_args["unit_rate_cb"](),
+                )
             last_vertex = v
             current_v_idx += 1
 

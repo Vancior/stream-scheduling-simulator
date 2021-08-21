@@ -61,6 +61,7 @@ class FlowScheduler(Scheduler):
         self, graph_list: typing.List[ExecutionGraph]
     ) -> typing.List[SchedulingResult]:
         results = [None for _ in graph_list]
+        result_s = [0 for _ in graph_list]
 
         for idx, g in enumerate(graph_list):
             if len(g.get_sources()) == 0:
@@ -120,7 +121,8 @@ class FlowScheduler(Scheduler):
                     )
             else:
                 dp = np.full((free_slots + 1,), MAX_FLOW, dtype=np.int64)
-                selected = np.full((free_slots + 1,), 0, dtype=np.int32)
+                selected = np.full((free_slots + 1,), -1, dtype=np.int32)
+                selected[0] = 0
                 choices = np.full((len(sg_list), free_slots + 1), -1, dtype=np.int32)
                 dp[0] = 0
                 for idx, sg in enumerate(sg_list):
@@ -137,12 +139,12 @@ class FlowScheduler(Scheduler):
                                 dp[capacity] = dp[capacity - volume] + option.flow
                                 selected[capacity] = idx + 1
                                 choices[idx, capacity] = o_idx
-                # print(dp)
-                # print(selected)
-                # print(choices)
+                print(dp)
+                print(selected)
+                print(choices)
                 valid_idx = np.where(selected == len(sg_list))[0]
                 min_slots = valid_idx[dp[valid_idx].argmin()]
-                # print(min_slots)
+                print(min_slots)
                 backtrace = min_slots
                 option_choice: typing.List[CutOption] = [
                     None for _ in range(len(sg_list))
@@ -177,7 +179,8 @@ class FlowScheduler(Scheduler):
                         random.choice(self.scenario.get_cloud_domains()).topo,
                     )
                     results[sg.idx] = SchedulingResult.merge(s_result, t_result)
-
+                    result_s[sg.idx] = len(option.s_cut)
+        print(result_s)
         return results
 
     def random_schedule(
