@@ -1,4 +1,5 @@
 import enum
+from graph.execution_graph import ExecutionGraph
 import typing
 
 
@@ -37,6 +38,19 @@ class SchedulingResult:
 
     def get_assignments(self) -> typing.ItemsView:
         return self.assign_map.items()
+
+    def check_complete(self, g: ExecutionGraph) -> bool:
+        for v in g.get_vertexs():
+            if self.assign_map.get(v.uuid) is None:
+                return False
+        return True
+
+    def extract(self, vid_set: typing.Set[str]):
+        result = SchedulingResult(self.status, self.reason)
+        for vid in list(vid_set):
+            if self.get_scheduled_node(vid) is not None:
+                result.assign(self.get_scheduled_node(vid), vid)
+        return result
 
     @classmethod
     def merge(cls, *results):

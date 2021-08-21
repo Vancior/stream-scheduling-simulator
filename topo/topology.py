@@ -1,6 +1,8 @@
+import logging
 import threading
 import typing
 from typing import NamedTuple
+from utils import get_logger
 
 import networkx as nx
 
@@ -17,9 +19,11 @@ class Link(NamedTuple):
 
 class Topology:
     g: nx.Graph
+    logger: logging.Logger
 
     def __init__(self) -> None:
         self.g = nx.Graph()
+        self.logger = get_logger(self.__class__.__name__)
 
     def replace_graph(self, g: nx.Graph) -> None:
         self.g = g

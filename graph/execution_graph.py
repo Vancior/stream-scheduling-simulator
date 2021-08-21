@@ -65,8 +65,14 @@ class ExecutionGraph:
     def get_sinks(self):
         return [v for v in self.get_vertexs() if v.type == "sink"]
 
-    def get_operator(self):
+    def get_operators(self):
         return [v for v in self.get_vertexs() if v.type == "operator"]
+
+    def get_in_vertexs(self):
+        return [v for v in self.get_vertexs() if self.g.in_degree(v.uuid) == 0]
+
+    def get_out_vertexs(self):
+        return [v for v in self.get_vertexs() if self.g.out_degree(v.uuid) == 0]
 
     def topological_order(self) -> typing.Generator[Vertex, None, None]:
         return [self.g.nodes[vid]["vertex"] for vid in topological_sort(self.g)]
@@ -83,4 +89,10 @@ class ExecutionGraph:
                     e[2]["unit_size"],
                     e[2]["per_second"],
                 )
+        return g
+
+    @classmethod
+    def merge(cls, graph_list, uuid: str):
+        g = ExecutionGraph(uuid)
+        g.g = nx.compose_all([i.g for i in graph_list])
         return g

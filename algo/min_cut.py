@@ -1,8 +1,11 @@
 import typing
 from collections import namedtuple
 from typing import NamedTuple
+from utils import gen_uuid
 
 from graph import ExecutionGraph
+
+MAX_EDGE_CAPACITY = int(1e20)
 
 
 class FlowGraphNode(NamedTuple):
@@ -66,8 +69,10 @@ class FlowGraph:
 
 
 def min_cut(g: ExecutionGraph):
-    nodes = {v.uuid: FlowGraphNode([]) for v in g.get_vertexs()}
-    edges = []
+    nodes: typing.Dict[str, FlowGraphNode] = {
+        v.uuid: FlowGraphNode([]) for v in g.get_vertexs()
+    }
+    edges: typing.List[FlowGraphEdge] = []
     index = 0
     for u, v, d in g.get_edges():
         # output_node = g.get_vertex(e[0])
@@ -80,11 +85,28 @@ def min_cut(g: ExecutionGraph):
         nodes[v].out_edges.append(index)
         index += 1
 
+    fake_source = gen_uuid()
+    fake_sink = gen_uuid()
+    nodes[fake_source] = FlowGraphNode([])
+    nodes[fake_sink] = FlowGraphNode([])
+    for s in g.get_in_vertexs():
+        edges.append(FlowGraphEdge(fake_source, s.uuid, MAX_EDGE_CAPACITY, 0))
+        nodes[fake_source].out_edges.append(index)
+        index += 1
+        edges.append(FlowGraphEdge(s.uuid, fake_source, 0, 0))
+        nodes[s.uuid].out_edges.append(index)
+        index += 1
+    for s in g.get_out_vertexs():
+        edges.append(FlowGraphEdge(s.uuid, fake_sink, MAX_EDGE_CAPACITY, 0))
+        nodes[s.uuid].out_edges.append(index)
+        index += 1
+        edges.append(FlowGraphEdge(fake_sink, s.uuid, 0, 0))
+        nodes[fake_sink].out_edges.append(index)
+        index += 1
+
     flow_graph = FlowGraph(nodes, edges)
-    source = g.get_sources()[0].uuid  # TODO
-    sink = g.get_sinks()[0].uuid  # TODO
     while True:
-        path = flow_graph.shortest_path(source, sink)
+        path = flow_graph.shortest_path(fake_source, fake_sink)
         if len(path) == 0:
             break
         min_incr = min([p.cap - p.flow for p in path])
@@ -93,6 +115,14 @@ def min_cut(g: ExecutionGraph):
             if p.cap - p.flow == 0:
                 p.disabled = True
 
-    s_cut = flow_graph.reachable(source)
+    s_cut = flow_graph.reachable(fake_source)
     t_cut = set(flow_graph.nodes.keys()) - s_cut
-    return s_cut, t_cut
+    s_cut.remove(fake_source)
+    t_cut.remove(fake_sink)
+
+    total_flow = 0
+    for e in edges:
+        if e.from_node in s_cut and e.to_node in t_cut:
+            total_flow += e.flow
+
+    return s_cut, t_cut, total_flow

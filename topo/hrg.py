@@ -21,7 +21,9 @@ class HRG:
 
     def replace_graph(self, g: nx.Graph):
         self.topo.replace_graph(g.subgraph([n.uuid for n in self.topo.get_nodes()]))
-        self.switch.replace_node = self.topo.get_node(self.switch.node.uuid)
+        self.switch.replace_node(self.topo.get_node(self.switch.node.uuid))
+        for host in self.hosts:
+            host.replace_node(self.topo.get_node(host.node.uuid))
 
     @classmethod
     def from_dict(cls, data):

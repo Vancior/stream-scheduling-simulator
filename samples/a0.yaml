@@ -24,7 +24,7 @@ domains:
   hrgs:
   - replica: 1
     spec:
-      mips: 6000
+      mips: 1000
       cores: 4
       memory: 8
       labels:

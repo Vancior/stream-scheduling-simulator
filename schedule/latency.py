@@ -24,6 +24,9 @@ class LatencyCalculator:
     def add_scheduled_graph(
         self, graph: ExecutionGraph, result: SchedulingResult
     ) -> None:
+        if not result.check_complete(graph):
+            print("incomplete scheduling")
+            return
         self.graph_list.append(ScheduledGraph(graph, result))
         for u, v, d in graph.get_edges():
             self.topo.occupy_link(
@@ -31,8 +34,9 @@ class LatencyCalculator:
                 result.get_scheduled_node(v),
                 d["unit_size"] * d["per_second"],
             )
-        for v in graph.get_vertexs():
-            self.topo.occupy_node(result.get_scheduled_node(v.uuid))
+        # this has been executed in scheduler
+        # for v in graph.get_vertexs():
+        #     self.topo.occupy_node(result.get_scheduled_node(v.uuid))
 
     def compute_latency(self) -> typing.Dict[str, int]:
         result = dict()

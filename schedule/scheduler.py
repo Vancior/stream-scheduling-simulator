@@ -48,6 +48,11 @@ class Scheduler(ABC):
             host = domain.find_host(hostname)
             if host is None:
                 return False
+            self.logger.info(
+                "required: %d; remaining: %d",
+                count,
+                host.node.slots - host.node.occupied,
+            )
             if not domain.topo.slot_filter(count, host.node.uuid):
                 return False
         return True
