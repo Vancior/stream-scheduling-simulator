@@ -20,6 +20,7 @@ class SchedulingResult:
         self.assign_map = {}
         self.reason = reason
 
+    @classmethod
     def failed(cls, reason: str):
         return SchedulingResult(status=SchedulingResultStatus.FAILED, reason=reason)
 

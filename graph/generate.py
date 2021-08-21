@@ -27,6 +27,7 @@ class GraphGenerator:
         g = ExecutionGraph(self.name)
         v_source = Vertex(
             "{}-v{}".format(self.name, 0),
+            "source",
             {"host": random.choice(self.gen_args["source_hosts"])},
             self.gen_args["initial_unit_size"],
             self.gen_args["initial_unit_rate"],
@@ -54,6 +55,7 @@ class GraphGenerator:
 
         v_source = Vertex(
             "{}-v{}".format(self.name, 1),
+            "source",
             {"host": random.choice(self.gen_args["source_hosts"])},
             0,
             0,
@@ -63,6 +65,7 @@ class GraphGenerator:
         g.add_vertex(v_source)
         v_sink = Vertex(
             "{}-v{}".format(self.name, total_level),
+            "sink",
             {"host": random.choice(self.gen_args["sink_hosts"])},
             0,
             0,
@@ -76,6 +79,7 @@ class GraphGenerator:
         while current_v_idx < total_level:
             v = Vertex(
                 "{}-v{}".format(self.name, current_v_idx),
+                "operator",
                 {},
                 0,
                 0,

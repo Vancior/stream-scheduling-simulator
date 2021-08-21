@@ -1,5 +1,6 @@
 import logging
 from typing import NamedTuple
+import uuid
 
 import coloredlogs
 
@@ -11,6 +12,10 @@ def namedtuple_to_dict(t: NamedTuple):
     for k in t._fields:
         d[k] = getattr(t, k)
     return d
+
+
+def gen_uuid():
+    return str(uuid.uuid4())[:8]
 
 
 def get_logger(name: str):

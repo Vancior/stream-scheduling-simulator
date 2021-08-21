@@ -1,21 +1,12 @@
-from typing import NamedTuple
+import threading
 import typing
+from typing import NamedTuple
 
 import networkx as nx
-import threading
+
+from .node import Node
 
 LOCAL_BANDWIDTH = int(1e8)
-
-
-class Node(NamedTuple):
-    uuid: str
-    type: str
-    mips: int
-    cores: int
-    memory_total: int
-    memory_assigned: int
-    memory_used: int
-    labels: typing.Dict[str, str]
 
 
 class Link(NamedTuple):
@@ -25,8 +16,13 @@ class Link(NamedTuple):
 
 
 class Topology:
+    g: nx.Graph
+
     def __init__(self) -> None:
         self.g = nx.Graph()
+
+    def replace_graph(self, g: nx.Graph) -> None:
+        self.g = g
 
     def add_node(self, n: Node) -> None:
         self.g.add_node(
@@ -34,13 +30,13 @@ class Topology:
             type=n.type,
             mips=n.mips,
             cores=n.cores,
+            slots=n.slots,
             memory_total=n.memory_total,
             memory_assigned=n.memory_assigned,
             memory_used=n.memory_used,
-            memory_lock=threading.Lock(),
+            memory_lock=n.memory_lock,
             labels=n.labels,
-            occupied=0,
-            node=n,
+            occupied=n.occupied,
         )
 
     def add_nodes_from(self, nodes: typing.Iterable[Node]) -> None:
@@ -80,7 +76,7 @@ class Topology:
 
     def get_node(self, nid: str) -> Node:
         """return a read-only proxy"""
-        return self.g.nodes[nid]["node"]
+        return Node.from_networkx(nid, self.g.nodes[nid])
 
     def get_nodes(self) -> typing.List[Node]:
         return [self.get_node(nid) for nid in self.g.nodes()]
@@ -96,7 +92,7 @@ class Topology:
 
     def get_hosts(self) -> typing.List[Node]:
         return [
-            self.g.nodes[nid]["node"]
+            Node.from_networkx(nid, self.g.nodes[nid])
             for nid in self.g.nodes()
             if self.g.nodes[nid]["type"] == "host"
         ]
@@ -137,8 +133,16 @@ class Topology:
             mi / (min(node["cores"] / node["occupied"], 1) * node["mips"]) * 1000
         )
 
-    def occupy_node(self, nid: str):
-        self.g.nodes[nid]["occupied"] += 1
+    def occupy_node(self, nid: str, slot_required: int = 1) -> bool:
+        succeed = True
+        n = self.g.nodes[nid]
+        n["memory_lock"].acquire()
+        if n["occupied"] + slot_required <= n["slots"]:
+            n["occupied"] += slot_required
+        else:
+            succeed = False
+        n["memory_lock"].release()
+        return succeed
 
     def occupy_link(self, n1: str, n2: str, bd: int):
         """NOTE: shortest path is used"""
@@ -156,16 +160,6 @@ class Topology:
         for _, _, d in self.g.edges(data=True):
             d["occupied"] = 0
 
-    def filter_node_by_memory(self, memory_required: int) -> typing.List[Node]:
-        ns = []
-        for nid in self.g.nodes():
-            n = self.g.nodes[nid]
-            n["memory_lock"].acquire()
-            if n["memory_total"] - n["memory_assigned"] >= memory_required:
-                ns.append(n["node"])
-            n["memory_lock"].release()
-        return ns
-
     def memory_filter(self, memory_required: int, nid: str) -> bool:
         valid = False
         n = self.g.nodes[nid]
@@ -181,4 +175,13 @@ class Topology:
         for rk, rv in required_labels.items():
             if n["labels"].get(rk) is None or n["labels"].get(rk) != rv:
                 valid = False
+        return valid
+
+    def slot_filter(self, slot_required: int, nid: str) -> bool:
+        valid = False
+        n = self.g.nodes[nid]
+        n["memory_lock"].acquire()
+        if n["occupied"] + slot_required <= n["slots"]:
+            valid = True
+        n["memory_lock"].release()
         return valid

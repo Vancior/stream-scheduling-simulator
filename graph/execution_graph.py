@@ -7,6 +7,7 @@ from networkx.algorithms.dag import topological_sort
 
 class Vertex(NamedTuple):
     uuid: str
+    type: str
     domain_constraint: dict
     out_unit_size: int  # in bytes
     out_unit_rate: float  # per second
@@ -25,6 +26,7 @@ class ExecutionGraph:
     def add_vertex(self, v: Vertex) -> None:
         self.g.add_node(
             v.uuid,
+            type=v.type,
             domain_constraint=v.domain_constraint,
             out_unit_size=v.out_unit_size,
             mi=v.mi,
@@ -58,10 +60,13 @@ class ExecutionGraph:
         return self.g.edges(data=True)
 
     def get_sources(self):
-        return [v for v in self.get_vertexs() if self.g.in_degree(v.uuid) == 0]
+        return [v for v in self.get_vertexs() if v.type == "source"]
 
     def get_sinks(self):
-        return [v for v in self.get_vertexs() if self.g.out_degree(v.uuid) == 0]
+        return [v for v in self.get_vertexs() if v.type == "sink"]
+
+    def get_operator(self):
+        return [v for v in self.get_vertexs() if v.type == "operator"]
 
     def topological_order(self) -> typing.Generator[Vertex, None, None]:
         return [self.g.nodes[vid]["vertex"] for vid in topological_sort(self.g)]

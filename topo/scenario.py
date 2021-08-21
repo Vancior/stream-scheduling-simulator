@@ -12,6 +12,9 @@ class Scenario:
         self.delay = delay
         self.topo = Topology()
         self.link_topo()
+        self.domain_lookup_table = {}
+        for d in self.domains:
+            self.domain_lookup_table[d.name] = d
 
     def link_topo(self):
         for d in self.domains:
@@ -27,12 +30,17 @@ class Scenario:
                     self.bd,
                     self.delay,
                 )
+        for d in self.domains:
+            d.replace_graph(self.topo.g)
 
     def get_edge_domains(self) -> typing.List[Domain]:
         return [d for d in self.domains if d.type == "edge"]
 
     def get_cloud_domains(self) -> typing.List[Domain]:
         return [d for d in self.domains if d.type == "cloud"]
+
+    def find_domain(self, domain_name: str) -> typing.Optional[Domain]:
+        return self.domain_lookup_table.get(domain_name, None)
 
     @classmethod
     def from_dict(cls, data):

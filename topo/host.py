@@ -11,9 +11,12 @@ class Host:
         self.cores = cores
         self.memory = memory
         self.labels = labels
-        self.node = Node(
+        self.node = Node.from_spec(
             str(uuid.uuid4())[:8], "host", mips, cores, memory, 0, 0, labels
         )
+
+    def replace_node(self, node: Node) -> None:
+        self.node = node
 
     @classmethod
     def from_dict(cls, data: typing.Dict, host_seq: int):
