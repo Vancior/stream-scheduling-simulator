@@ -4,15 +4,7 @@ from typing import NamedTuple
 import networkx as nx
 from networkx.algorithms.dag import topological_sort
 
-
-class Vertex(NamedTuple):
-    uuid: str
-    type: str
-    domain_constraint: dict
-    out_unit_size: int  # in bytes
-    out_unit_rate: float  # per second
-    mi: int
-    memory: int
+from .vertex import Vertex
 
 
 class ExecutionGraph:
@@ -23,6 +15,17 @@ class ExecutionGraph:
         self.g = nx.DiGraph()
         self.uuid = uuid
 
+    def __str__(self) -> str:
+        return "Graph[{}][{}]".format(
+            self.uuid, ", ".join([v.uuid for v in self.get_vertexs()])
+        )
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def number_of_vertexs(self) -> int:
+        return self.g.number_of_nodes()
+
     def add_vertex(self, v: Vertex) -> None:
         self.g.add_node(
             v.uuid,
@@ -31,7 +34,7 @@ class ExecutionGraph:
             out_unit_size=v.out_unit_size,
             mi=v.mi,
             memory=v.memory,
-            vertex=v,
+            upstream_bd=v.upstream_bd,
         )
 
     def connect(
@@ -40,9 +43,13 @@ class ExecutionGraph:
         self.g.add_edge(
             v_from.uuid, v_to.uuid, unit_size=unit_size, per_second=per_second
         )
+        self.g.nodes[v_to.uuid]["upstream_bd"] += unit_size * per_second
+
+    def remove_vertex(self, vid: str) -> None:
+        self.g.remove_node(vid)
 
     def get_vertex(self, vid: str) -> Vertex:
-        return self.g.nodes[vid]["vertex"]
+        return Vertex.from_networkx(vid, self.g.nodes[vid])
 
     def get_vertexs(self) -> typing.List[Vertex]:
         return [self.get_vertex(vid) for vid in self.g.nodes()]
@@ -74,8 +81,32 @@ class ExecutionGraph:
     def get_out_vertexs(self):
         return [v for v in self.get_vertexs() if self.g.out_degree(v.uuid) == 0]
 
-    def topological_order(self) -> typing.Generator[Vertex, None, None]:
-        return [self.g.nodes[vid]["vertex"] for vid in topological_sort(self.g)]
+    def topological_order(self) -> typing.List[Vertex]:
+        return [self.get_vertex(vid) for vid in topological_sort(self.g)]
+
+    def topological_order_with_upstream_bd(self) -> typing.List[Vertex]:
+        new_g = nx.DiGraph()
+        for v in self.get_vertexs():
+            new_g.add_node(v.uuid, upstream_bd=v.upstream_bd)
+        for v_from, v_to, data in self.get_edges():
+            new_g.add_edge(v_from, v_to, bd=data["unit_size"] * data["per_second"])
+
+        v_seq = []
+        while new_g.number_of_nodes() != 0:
+            upstream_bds = sorted(
+                [
+                    (vid, new_g.nodes[vid]["upstream_bd"])
+                    for vid in new_g.nodes()
+                    if new_g.in_degree(vid) == 0
+                ],
+                key=lambda i: i[1],
+                reverse=True,
+            )
+            vid = upstream_bds[0][0]
+            v_seq.append(vid)
+            new_g.remove_node(vid)
+
+        return [self.get_vertex(vid) for vid in v_seq]
 
     def sub_graph(self, nids: typing.Set[str], uuid: str):
         g = ExecutionGraph(uuid)

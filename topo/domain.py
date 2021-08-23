@@ -44,6 +44,6 @@ class Domain:
 
     @classmethod
     def from_dict(cls, data):
-        router = Router.from_dict(data["router"])
+        router = Router.from_dict(data["name"] + "_router", data["router"])
         hrgs = [HRG.from_dict(d) for d in data["hrgs"]]
         return cls(data["type"], data["name"], router, hrgs)

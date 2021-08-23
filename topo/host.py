@@ -1,12 +1,19 @@
-import uuid
-from topo.topology import Node
 import typing
+import uuid
+
+from .node import Node
 
 
 class Host:
     def __init__(
-        self, mips: int, cores: int, memory: int, labels: typing.Dict[str, str]
+        self,
+        name: str,
+        mips: int,
+        cores: int,
+        memory: int,
+        labels: typing.Dict[str, str],
     ) -> None:
+        self.name = name
         self.mips = mips
         self.cores = cores
         self.memory = memory
@@ -19,9 +26,13 @@ class Host:
         self.node = node
 
     @classmethod
-    def from_dict(cls, data: typing.Dict, host_seq: int):
-        labels = {"host": "{}{}".format(data["prefix"], host_seq)}
+    def from_dict(cls, name: str, data: typing.Dict):
+        labels = {"host": name}
         labels.update(data["labels"])
         return cls(
-            int(data["mips"]), int(data["cores"]), int(data["memory"] * 1e9), labels
+            name,
+            int(data["mips"]),
+            int(data["cores"]),
+            int(data["memory"] * 1e9),
+            labels,
         )

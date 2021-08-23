@@ -5,14 +5,14 @@ domains:
     bd: 1000
     delay: 5
   hrgs:
-  - replica: 1
+  - name: cloud
+    replica: 1
     spec:
       mips: 5000
       cores: 1000
       memory: 2000
       labels:
         machine: rack
-      prefix: cloud
     switch:
       bd: 1000
       delay: 5
@@ -22,7 +22,8 @@ domains:
     bd: 1000
     delay: 5
   hrgs:
-  - replica: 1
+  - name: rasp
+    replica: 1
     spec:
       mips: 2000
       cores: 4
@@ -30,7 +31,6 @@ domains:
       labels:
         machine: rasp
         connector: robot
-      prefix: rasp
     switch:
       bd: 300
       delay: 5

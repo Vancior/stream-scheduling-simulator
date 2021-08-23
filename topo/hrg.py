@@ -7,7 +7,8 @@ from topo.topology import Topology
 
 
 class HRG:
-    def __init__(self, switch: Switch, hosts: typing.List[Host]) -> None:
+    def __init__(self, name: str, switch: Switch, hosts: typing.List[Host]) -> None:
+        self.name = name
         self.switch = switch
         self.hosts = hosts
         self.topo = Topology()
@@ -28,6 +29,11 @@ class HRG:
     @classmethod
     def from_dict(cls, data):
         hosts = [
-            Host.from_dict(data["spec"], i + 1) for i in range(int(data["replica"]))
+            Host.from_dict(data["name"] + str(i + 1), data["spec"])
+            for i in range(int(data["replica"]))
         ]
-        return cls(Switch.from_dict(data["switch"]), hosts)
+        return cls(
+            data["name"],
+            Switch.from_dict(data["name"] + "_switch", data["switch"]),
+            hosts,
+        )

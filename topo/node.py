@@ -87,3 +87,12 @@ class Node:
         occupied = self.data["occupied"]
         self.data["memory_lock"].release()
         return occupied
+
+    def occupy(self, n: int) -> bool:
+        succeed = False
+        self.data["memory_lock"].acquire()
+        if self.data["slots"] - self.data["occupied"] >= n:
+            succeed = True
+            self.data["occupied"] += n
+        self.data["memory_lock"].release()
+        return succeed

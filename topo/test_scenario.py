@@ -1,6 +1,5 @@
 import os
 
-import IPython
 import yaml
 from yaml.loader import Loader
 

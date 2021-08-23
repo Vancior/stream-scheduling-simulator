@@ -5,7 +5,7 @@ from collections import defaultdict, namedtuple
 import numpy as np
 from algo import min_cut
 from graph import ExecutionGraph
-from topo import Topology, Domain
+from topo import Domain, Topology
 from utils import gen_uuid
 
 from .result import SchedulingResult, SchedulingResultStatus
@@ -17,7 +17,7 @@ SourcedGraph = namedtuple("SourcedGraph", ["idx", "g"])
 
 
 class FlowScheduler(Scheduler):
-    def schedule(self, g: ExecutionGraph, topo: Topology) -> SchedulingResult:
+    def schedule(self, g: ExecutionGraph, topo: Topology = None) -> SchedulingResult:
         # A. if sources not fit into hosts, reject
         # B. do min-cut on g into S & T
         # C. if |S| > edge slots, goto D, else goto E
@@ -61,8 +61,9 @@ class FlowScheduler(Scheduler):
         self, graph_list: typing.List[ExecutionGraph]
     ) -> typing.List[SchedulingResult]:
         results = [None for _ in graph_list]
-        result_s = [0 for _ in graph_list]
+        # result_s = [0 for _ in graph_list]
 
+        # NOTE: schedule non-contraint graph to cloud
         for idx, g in enumerate(graph_list):
             if len(g.get_sources()) == 0:
                 results[idx] = RandomScheduler(self.scenario).schedule(
@@ -75,6 +76,7 @@ class FlowScheduler(Scheduler):
             if g.get_sources() != 0
         ]
 
+        # NOTE: group graphs by edge domains
         edge_domain_map: typing.Dict[str, typing.List[SourcedGraph]] = defaultdict(list)
         for sg in sourced_graphs:
             edge_domain = self.if_source_in_single_domain(sg.g)
@@ -89,10 +91,13 @@ class FlowScheduler(Scheduler):
                 )
             edge_domain_map[edge_domain.name].append(sg)
 
+        # NOTE: for each edge domain
         for domain_name, sg_list in edge_domain_map.items():
             edge_domain = self.scenario.find_domain(domain_name)
             if edge_domain is None:
                 continue
+
+            # NOTE: generate cut options, if no option provided, skip this edge domain
             graph_cut_options: typing.List[typing.List[CutOption]] = [
                 sorted(gen_cut_options(sg.g), key=lambda o: o.flow) for sg in sg_list
             ]
@@ -113,12 +118,21 @@ class FlowScheduler(Scheduler):
                 )
                 <= free_slots
             ):
-                # REVIEW: all s_cut should be put into one graph (in order to use topological sort)
-                for idx, sg in enumerate(sg_list):
-                    options = graph_cut_options[idx]
-                    results[sg.idx] = self.random_schedule(
-                        sg.g, options[0].s_cut, options[0].t_cut, edge_domain
+                # NOTE: if slots are enough for min-cut
+                s_graph_list = []
+                for sg, options in zip(sg_list, graph_cut_options):
+                    s_graph_list.append(sg.g.sub_graph(options[0].s_cut, gen_uuid()))
+                big_s_graph = ExecutionGraph.merge(s_graph_list, gen_uuid())
+                big_result = RandomScheduler(self.scenario).schedule(
+                    big_s_graph, edge_domain.topo
+                )
+                for sg, options in zip(sg_list, graph_cut_options):
+                    s_result = big_result.extract(options[0].s_cut)
+                    t_result = RandomScheduler(self.scenario).schedule(
+                        sg.g.sub_graph(options[0].t_cut),
+                        random.choice(self.scenario.get_cloud_domains()).topo,
                     )
+                    results[sg.idx] = SchedulingResult.merge(s_result, t_result)
             else:
                 dp = np.full((free_slots + 1,), MAX_FLOW, dtype=np.int64)
                 selected = np.full((free_slots + 1,), -1, dtype=np.int32)
@@ -132,6 +146,8 @@ class FlowScheduler(Scheduler):
                             volume = len(option.s_cut)
                             if volume > capacity:
                                 continue
+                            # NOTE: if previous groups are selected
+                            # NOTE: if selected[capacity] not be overwrited at this round, it cannot be used at next round
                             if selected[capacity - volume] == idx and (
                                 dp[capacity - volume] + option.flow < dp[capacity]
                                 or selected[capacity] == idx
@@ -139,13 +155,12 @@ class FlowScheduler(Scheduler):
                                 dp[capacity] = dp[capacity - volume] + option.flow
                                 selected[capacity] = idx + 1
                                 choices[idx, capacity] = o_idx
-                print(dp)
-                print(selected)
-                print(choices)
+                # print(dp)
+                # print(selected)
+                # print(choices)
                 valid_idx = np.where(selected == len(sg_list))[0]
-                min_slots = valid_idx[dp[valid_idx].argmin()]
-                print(min_slots)
-                backtrace = min_slots
+                backtrace = valid_idx[dp[valid_idx].argmin()]
+                # print(backtrace)
                 option_choice: typing.List[CutOption] = [
                     None for _ in range(len(sg_list))
                 ]
@@ -156,16 +171,12 @@ class FlowScheduler(Scheduler):
                     option_choice[i] = graph_cut_options[i][choices[i, backtrace]]
                     backtrace -= len(option_choice[i].s_cut)
 
-                # REVIEW: all s_cut should be put into one graph (in order to use topological sort)
                 s_graph_list = []
                 for sg, option in zip(sg_list, option_choice):
                     if option is None:
                         self.logger.error("malicious option")
                         continue
                     s_graph_list.append(sg.g.sub_graph(option.s_cut, gen_uuid()))
-                    # results[sg.idx] = self.random_schedule(
-                    #     sg.g, option.s_cut, option.t_cut, edge_domain
-                    # )
                 big_s_graph = ExecutionGraph.merge(s_graph_list, gen_uuid())
                 big_result = RandomScheduler(self.scenario).schedule(
                     big_s_graph, edge_domain.topo
@@ -179,8 +190,8 @@ class FlowScheduler(Scheduler):
                         random.choice(self.scenario.get_cloud_domains()).topo,
                     )
                     results[sg.idx] = SchedulingResult.merge(s_result, t_result)
-                    result_s[sg.idx] = len(option.s_cut)
-        print(result_s)
+                    # result_s[sg.idx] = len(option.s_cut)
+        # print(result_s)
         return results
 
     def random_schedule(
