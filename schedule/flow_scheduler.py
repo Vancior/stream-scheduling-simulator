@@ -150,7 +150,7 @@ class FlowScheduler(Scheduler):
                             # NOTE: if selected[capacity] not be overwrited at this round, it cannot be used at next round
                             if selected[capacity - volume] == idx and (
                                 dp[capacity - volume] + option.flow < dp[capacity]
-                                or selected[capacity] == idx
+                                or selected[capacity] <= idx
                             ):
                                 dp[capacity] = dp[capacity - volume] + option.flow
                                 selected[capacity] = idx + 1

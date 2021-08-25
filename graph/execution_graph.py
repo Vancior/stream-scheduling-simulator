@@ -35,6 +35,7 @@ class ExecutionGraph:
             mi=v.mi,
             memory=v.memory,
             upstream_bd=v.upstream_bd,
+            downstream_bd=v.downstream_bd,
         )
 
     def connect(
@@ -44,6 +45,7 @@ class ExecutionGraph:
             v_from.uuid, v_to.uuid, unit_size=unit_size, per_second=per_second
         )
         self.g.nodes[v_to.uuid]["upstream_bd"] += unit_size * per_second
+        self.g.nodes[v_from.uuid]["downstream_bd"] += unit_size * per_second
 
     def remove_vertex(self, vid: str) -> None:
         self.g.remove_node(vid)

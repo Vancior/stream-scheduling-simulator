@@ -1,4 +1,5 @@
 import heapq
+from schedule.flow_scheduler import MAX_FLOW
 import typing
 from collections import defaultdict
 
@@ -8,6 +9,8 @@ from topo import Domain, Host, Node, Topology
 from utils import gen_uuid
 
 from schedule import SchedulingResult
+
+MAX_FLOW = int(1e18)
 
 
 class ProvisionerNode:
@@ -74,12 +77,13 @@ class ProvisionerNode:
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
         ]
         groups = [
-            [(v_count + 1, v.upstream_bd) for v_count, v in enumerate(vs)]
+            [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
+            + [(len(vs), vs[len(vs) - 1].downstream_bd)]
             for vs in topological_sorted_graphs
         ]
-        solution = self.dp(n_slot, groups)
-        for gid, eid in solution:
-            v_count = groups[gid][eid][0]
+        solution = self.grouped_exactly_one_binpack(n_slot, groups)
+        for gid, s_idx in enumerate(solution):
+            v_count = groups[gid][s_idx][0]
             for vidx in range(v_count):
                 v = topological_sorted_graphs[gid][vidx]
                 self.scheduled_vertexs.append(v)
@@ -138,8 +142,8 @@ class ProvisionerNode:
                 [(v_count + 1, v.upstream_bd) for v_count, v in enumerate(vs)]
                 for vs in topological_sorted_graphs
             ]
-            solution = self.dp(child_slots, groups)
-            for gid, eid in solution:
+            solution = self.grouped_exactly_one_binpack(child_slots, groups)
+            for gid, eid in enumerate(solution):
                 v_count = groups[gid][eid][0]
                 vertex_cut = set(
                     [topological_sorted_graphs[gid][i].uuid for i in range(v_count)]
@@ -152,21 +156,35 @@ class ProvisionerNode:
 
         return graph_passed_to_children
 
-    def dp(
+    def grouped_exactly_one_binpack(
         self, n_slot: int, groups: typing.List[typing.List[typing.Tuple[int, int]]]
-    ) -> typing.List[typing.Tuple[int, int]]:
-        dp = [0 for _ in range(n_slot + 1)]
-        selected = [[] for _ in range(n_slot + 1)]
+    ) -> typing.List[int]:
+        dp = np.full((n_slot + 1,), MAX_FLOW, dtype=np.int64)
+        selected = np.full((n_slot + 1,), -1, dtype=np.int32)
+        selected[0] = 0
+        choices = np.full((len(groups), n_slot + 1), -1, dtype=np.int32)
+        dp[0] = 0
         for gid, group in enumerate(groups):
             for capacity in range(n_slot, -1, -1):
                 for eid, ele in enumerate(group):
                     volume, value = ele
                     if capacity < volume:
                         continue
-                    if dp[capacity - volume] + value > dp[capacity]:
+                    if selected[capacity - volume] == gid and (
+                        dp[capacity - volume] + value < dp[capacity]
+                        or selected[capacity] <= gid
+                    ):
                         dp[capacity] = dp[capacity - volume] + value
-                        selected[capacity] = selected[capacity - volume] + [(gid, eid)]
-        return selected[n_slot]
+                        selected[capacity] = gid + 1
+                        choices[gid, capacity] = eid
+
+        backtrace = n_slot
+        solution: typing.List[int] = [None for _ in range(len(groups))]
+        for gid in range(len(groups) - 1, -1, -1):
+            assert choices[gid, backtrace] >= 0
+            solution[gid] = choices[gid, backtrace]
+            backtrace -= groups[gid][solution[gid]][0]
+        return solution
 
 
 class ProvisionerTree:

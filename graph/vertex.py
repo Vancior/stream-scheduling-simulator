@@ -28,6 +28,7 @@ class Vertex:
             "mi": mi,
             "memory": memory,
             "upstream_bd": 0,
+            "downstream_bd": 0,
         }
         return cls(uuid, data)
 
@@ -62,3 +63,7 @@ class Vertex:
     @property
     def upstream_bd(self) -> int:
         return self.data["upstream_bd"]
+
+    @property
+    def downstream_bd(self) -> int:
+        return self.data["downstream_bd"]
