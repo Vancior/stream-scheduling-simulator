@@ -1,8 +1,9 @@
 import heapq
 import logging
-from schedule.flow_scheduler import MAX_FLOW
+import time
 import typing
 from collections import defaultdict
+from functools import reduce
 
 import numpy as np
 from graph import ExecutionGraph
@@ -10,8 +11,31 @@ from topo import Domain, Host, Node, Topology
 from utils import gen_uuid, get_logger
 
 from schedule import SchedulingResult
+from schedule.flow_scheduler import MAX_FLOW
 
 MAX_FLOW = int(1e18)
+
+
+class ProvisionerScatter:
+    unscheduled_graphs: typing.List[ExecutionGraph]
+    slot_diff: int
+
+    def __init__(
+        self,
+        unscheduled_graphs: typing.List[ExecutionGraph] = None,
+        slot_diff: int = None,
+    ) -> None:
+        self.unscheduled_graphs = unscheduled_graphs
+        self.slot_diff = slot_diff
+
+    def __str__(self) -> str:
+        return "slot: {}, graphs: {}".format(self.slot_diff, self.unscheduled_graphs)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def empty(self) -> bool:
+        return self.unscheduled_graphs is None and self.slot_diff is None
 
 
 class ProvisionerNode:
@@ -25,13 +49,13 @@ class ProvisionerNode:
         self.type = type
         self.node = node
         self.local_slots = node.slots
-        self.slot_diff = 0
-        self.parent = parent
-        self.children = []
+        self.slot_diff = self.local_slots
+        self.parent: ProvisionerNode = parent
+        self.children: typing.List[ProvisionerNode] = []
         self.children_slots = []
         self.scheduled_vertexs = []
         self.unscheduled_graphs = []
-        self.logger = get_logger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__ + "[{}]".format(self.name))
 
     def add_child(self, child) -> None:
         self.children.append(child)
@@ -40,29 +64,55 @@ class ProvisionerNode:
     def add_unscheduled_graph(self, g: ExecutionGraph) -> None:
         self.unscheduled_graphs.append(g)
 
-    def child_slots_change(self, child_name: str, slot_diff: int):
-        for idx, child in enumerate(self.children):
-            if child.name == child_name:
-                self.children_slots[idx] += slot_diff
-                break
-        self.slot_diff += slot_diff
+    def gather_from_parent(self, scatter: ProvisionerScatter):
+        if scatter.unscheduled_graphs is not None:
+            for g in scatter.unscheduled_graphs:
+                self.add_unscheduled_graph(g)
 
-    def step(self) -> bool:
-        if len(self.unscheduled_graphs) == 0:
-            return self.slot_diff != 0
+    def gather_from_child(self, child_name: str, scatter: ProvisionerScatter):
+        for child_idx, child in enumerate(self.children):
+            if child.name != child_name:
+                continue
+            if scatter.slot_diff is not None:
+                self.children_slots[child_idx] += scatter.slot_diff
+                self.slot_diff += scatter.slot_diff
+            if scatter.unscheduled_graphs is not None:
+                for g in scatter.unscheduled_graphs:
+                    self.add_unscheduled_graph(g)
+
+    def step(
+        self,
+    ) -> typing.Tuple[bool, ProvisionerScatter, typing.List[ProvisionerScatter]]:
+        if len(self.unscheduled_graphs) == 0 and self.slot_diff == 0:
+            return False, None, None
 
         if self.local_slots - self.node.occupied > 0:
             self.schedule_graph_with_limit(self.local_slots - self.node.occupied)
+            self.clear_empty_graphs()
         self.logger.debug("after local scheduling: %s", self.unscheduled_graphs)
 
         if len(self.unscheduled_graphs) > 0:
             graph_passed_to_children = self.pass_graph_to_children()
+            self.clear_empty_graphs()
+        else:
+            graph_passed_to_children = [None for _ in self.children]
+        self.logger.debug("children graph: %s", graph_passed_to_children)
+        self.logger.debug("unscheduled graph: %s", self.unscheduled_graphs)
+        self.logger.debug("children slots: %s", self.children_slots)
+        self.logger.debug("slot diff: %s", self.slot_diff)
 
-        # TODO: build scatter
-        # A. pass graphs to children
-        # B. pass residual unscheduled graphs to parent & clear local
-        # C. update slot_diff to parent
-        return True
+        children_scatters = [ProvisionerScatter() for _ in self.children]
+        for scatter, graphs in zip(children_scatters, graph_passed_to_children):
+            scatter.unscheduled_graphs = graphs
+        parent_scatter = ProvisionerScatter()
+        if len(self.unscheduled_graphs) > 0:
+            parent_scatter.unscheduled_graphs = self.unscheduled_graphs
+            self.unscheduled_graphs = []
+        if self.slot_diff != 0:
+            parent_scatter.slot_diff = self.slot_diff
+            self.slot_diff = 0
+
+        return True, parent_scatter, children_scatters
 
     def schedule_graph_with_limit(self, n_slot: int):
         # NOTE: A. schedule sources first
@@ -80,7 +130,7 @@ class ProvisionerNode:
         topological_sorted_graphs = [
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
         ]
-        # REVIEW: upstream_bd could be replaced with exact cross-cut bd
+        # REVIEW upstream_bd could be replaced with exact cross-cut bd
         groups = [
             [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
             + [(len(vs), vs[len(vs) - 1].downstream_bd)]
@@ -95,10 +145,6 @@ class ProvisionerNode:
                 assert self.node.occupy(1)
                 self.slot_diff -= 1
                 self.unscheduled_graphs[gid].remove_vertex(v.uuid)
-
-        self.unscheduled_graphs = [
-            g for g in self.unscheduled_graphs if g.number_of_vertexs() > 0
-        ]
 
     def pass_graph_to_children(self) -> typing.List[typing.List[ExecutionGraph]]:
         # SECTION A. schedule whole graphs
@@ -124,8 +170,16 @@ class ProvisionerNode:
                 if n_vertex > child_slots:
                     g_idx += 1
                     continue
-                graph_passed_to_children[child_idx].append(g)
+                # NOTE copy graph
+                graph_passed_to_children[child_idx].append(
+                    ExecutionGraph.merge([g], g.uuid)
+                )
+                sorted_unscheduled_graphs.pop(g_idx)
+                # NOTE remove all vertexs in original graph, so that it will be filtered out
+                for v in g.get_vertexs():
+                    g.remove_vertex(v.uuid)
                 self.children_slots[child_idx] -= n_vertex
+                self.slot_diff -= n_vertex
                 # NOTE if capacity is not 0, push into heap
                 if n_vertex < child_slots:
                     heapq.heappush(
@@ -133,8 +187,6 @@ class ProvisionerNode:
                         (n_vertex - child_slots, child_idx, child_slots - n_vertex),
                     )
                 break
-            if g_idx < len(sorted_unscheduled_graphs):
-                sorted_unscheduled_graphs.pop(g_idx)
         # !SECTION
         # SECTION B. split graphs to remaining children slots (from large to small)
         for child_idx, child_slots in sorted(
@@ -145,7 +197,7 @@ class ProvisionerNode:
             topological_sorted_graphs = [
                 g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
             ]
-            # REVIEW: upstream_bd could be replaced with exact cross-cut bd
+            # REVIEW upstream_bd could be replaced with exact cross-cut bd
             groups = [
                 [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
                 + [(len(vs), vs[len(vs) - 1].downstream_bd)]
@@ -164,6 +216,8 @@ class ProvisionerNode:
                 )
                 for v in vertex_cut:
                     self.unscheduled_graphs[gid].remove_vertex(v)
+                self.children_slots[child_idx] -= v_count
+                self.slot_diff -= v_count
         # !SECTION
         return graph_passed_to_children
 
@@ -197,6 +251,16 @@ class ProvisionerNode:
             backtrace -= groups[gid][solution[gid]][0]
         return solution
 
+    def clear_empty_graphs(self) -> None:
+        self.unscheduled_graphs = [
+            g for g in self.unscheduled_graphs if g.number_of_vertexs() > 0
+        ]
+
+    def traversal(self, f) -> None:
+        f(self)
+        for child in self.children:
+            child.traversal(f)
+
 
 class ProvisionerTree:
     name_lookup_map: typing.Dict[str, ProvisionerNode]
@@ -212,6 +276,28 @@ class ProvisionerTree:
     def get_node(self, name: str) -> typing.Optional[ProvisionerNode]:
         return self.name_lookup_map.get(name)
 
+    def step(self) -> bool:
+        node_step_map = {k: v.step() for k, v in self.name_lookup_map.items()}
+        updated = reduce(
+            lambda i, j: i or j, [i[0] for i in node_step_map.values()], False
+        )
+        if not updated:
+            return updated
+        for node_name, step_result in node_step_map.items():
+            node = self.name_lookup_map[node_name]
+            if not step_result[0]:
+                continue
+            if step_result[1] is not None and node.parent is not None:
+                node.parent.gather_from_child(node.name, step_result[1])
+            if step_result[2] is not None:
+                for child, scatter in zip(node.children, step_result[2]):
+                    if scatter is not None:
+                        child.gather_from_parent(scatter)
+        return True
+
+    def traversal(self, f) -> None:
+        self.root.traversal(f)
+
 
 class TopologicalResourceProvisioner:
     domain: Domain
@@ -222,6 +308,8 @@ class TopologicalResourceProvisioner:
         self.domain = domain
         self.topo = domain.topo
         self.tree = self.build_provisioner_tree()
+        # NOTE initial propagation for slots
+        self.rebalance()
 
     def schedule_multiple(
         self, graph_list: typing.List[ExecutionGraph]
@@ -232,11 +320,17 @@ class TopologicalResourceProvisioner:
         host_set: typing.Set[Host] = set()
         for s in g.get_sources():
             assert s.domain_constraint.get("host") is not None
-            host_set.add(self.domain.find_host(s.domain_constraint["host"]))
+            host = self.domain.find_host(s.domain_constraint["host"])
+            assert host is not None
+            host_set.add(host)
         assert len(host_set) == 1
         host = list(host_set)[0]
         node = self.tree.get_node(host.name)
         node.add_unscheduled_graph(g)
+
+    def rebalance(self) -> None:
+        while self.tree.step():
+            pass
 
     def build_provisioner_tree(self) -> ProvisionerTree:
         router_node = ProvisionerNode(
@@ -253,3 +347,4 @@ class TopologicalResourceProvisioner:
                 tree.add_node(host_node)
                 switch_node.add_child(host_node)
             router_node.add_child(switch_node)
+        return tree
