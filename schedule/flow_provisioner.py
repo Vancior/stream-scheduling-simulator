@@ -1,4 +1,5 @@
 import heapq
+import logging
 from schedule.flow_scheduler import MAX_FLOW
 import typing
 from collections import defaultdict
@@ -6,7 +7,7 @@ from collections import defaultdict
 import numpy as np
 from graph import ExecutionGraph
 from topo import Domain, Host, Node, Topology
-from utils import gen_uuid
+from utils import gen_uuid, get_logger
 
 from schedule import SchedulingResult
 
@@ -15,6 +16,7 @@ MAX_FLOW = int(1e18)
 
 class ProvisionerNode:
     unscheduled_graphs: typing.List[ExecutionGraph]
+    logger: logging.Logger
 
     def __init__(
         self, name: str, type: str, node: Node, parent: typing.Optional[Node]
@@ -29,6 +31,7 @@ class ProvisionerNode:
         self.children_slots = []
         self.scheduled_vertexs = []
         self.unscheduled_graphs = []
+        self.logger = get_logger(self.__class__.__name__)
 
     def add_child(self, child) -> None:
         self.children.append(child)
@@ -50,8 +53,8 @@ class ProvisionerNode:
 
         if self.local_slots - self.node.occupied > 0:
             self.schedule_graph_with_limit(self.local_slots - self.node.occupied)
+        self.logger.debug("after local scheduling: %s", self.unscheduled_graphs)
 
-        print("after local scheduling", self.unscheduled_graphs)
         if len(self.unscheduled_graphs) > 0:
             graph_passed_to_children = self.pass_graph_to_children()
 
@@ -62,6 +65,7 @@ class ProvisionerNode:
         return True
 
     def schedule_graph_with_limit(self, n_slot: int):
+        # NOTE: A. schedule sources first
         for g in self.unscheduled_graphs:
             for s in g.get_sources():
                 if s.domain_constraint.get("host") != self.name:
@@ -76,6 +80,7 @@ class ProvisionerNode:
         topological_sorted_graphs = [
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
         ]
+        # REVIEW: upstream_bd could be replaced with exact cross-cut bd
         groups = [
             [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
             + [(len(vs), vs[len(vs) - 1].downstream_bd)]
@@ -96,11 +101,11 @@ class ProvisionerNode:
         ]
 
     def pass_graph_to_children(self) -> typing.List[typing.List[ExecutionGraph]]:
-        # A. fill slots if a whole graph could be fitted
+        # SECTION A. schedule whole graphs
         heap_children_slots: typing.List[int, int, int] = []
         for idx, slots in enumerate(self.children_slots):
             heapq.heappush(heap_children_slots, (-slots, idx, slots))
-        # REVIEW: could be sorted by input bd
+        # REVIEW could be sorted by (number of vertex, input bd)
         sorted_unscheduled_graphs = sorted(
             [(g.number_of_vertexs(), g) for g in self.unscheduled_graphs],
             key=lambda i: i[0],
@@ -110,41 +115,47 @@ class ProvisionerNode:
         graph_passed_to_children: typing.List[typing.List[ExecutionGraph]] = [
             list() for _ in self.children_slots
         ]
+        # NOTE pick the largest children slot everytime
         while len(heap_children_slots) > 0:
             _, child_idx, child_slots = heapq.heappop(heap_children_slots)
             g_idx = 0
+            # NOTE find the largest graph that can fit into the slot as a whole
             for n_vertex, g in sorted_unscheduled_graphs:
                 if n_vertex > child_slots:
                     g_idx += 1
                     continue
                 graph_passed_to_children[child_idx].append(g)
                 self.children_slots[child_idx] -= n_vertex
+                # NOTE if capacity is not 0, push into heap
                 if n_vertex < child_slots:
                     heapq.heappush(
                         heap_children_slots,
                         (n_vertex - child_slots, child_idx, child_slots - n_vertex),
                     )
                 break
-            if g_idx >= len(sorted_unscheduled_graphs):
-                continue
-            sorted_unscheduled_graphs.pop(g_idx)
-            sorted_unscheduled_graphs = sorted(
-                sorted_unscheduled_graphs, key=lambda i: i[0], reverse=True
-            )
-
-        for child_idx, child_slots in enumerate(self.children_slots):
+            if g_idx < len(sorted_unscheduled_graphs):
+                sorted_unscheduled_graphs.pop(g_idx)
+        # !SECTION
+        # SECTION B. split graphs to remaining children slots (from large to small)
+        for child_idx, child_slots in sorted(
+            enumerate(self.children_slots), key=lambda e: e[1], reverse=True
+        ):
             if child_slots == 0:
                 continue
             topological_sorted_graphs = [
                 g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
             ]
+            # REVIEW: upstream_bd could be replaced with exact cross-cut bd
             groups = [
-                [(v_count + 1, v.upstream_bd) for v_count, v in enumerate(vs)]
+                [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
+                + [(len(vs), vs[len(vs) - 1].downstream_bd)]
                 for vs in topological_sorted_graphs
             ]
             solution = self.grouped_exactly_one_binpack(child_slots, groups)
             for gid, eid in enumerate(solution):
                 v_count = groups[gid][eid][0]
+                if v_count == 0:
+                    continue
                 vertex_cut = set(
                     [topological_sorted_graphs[gid][i].uuid for i in range(v_count)]
                 )
@@ -153,7 +164,7 @@ class ProvisionerNode:
                 )
                 for v in vertex_cut:
                     self.unscheduled_graphs[gid].remove_vertex(v)
-
+        # !SECTION
         return graph_passed_to_children
 
     def grouped_exactly_one_binpack(
@@ -177,8 +188,8 @@ class ProvisionerNode:
                         dp[capacity] = dp[capacity - volume] + value
                         selected[capacity] = gid + 1
                         choices[gid, capacity] = eid
-
-        backtrace = n_slot
+        valid_idx = np.where(selected == len(groups))[0]
+        backtrace = valid_idx[-1]
         solution: typing.List[int] = [None for _ in range(len(groups))]
         for gid in range(len(groups) - 1, -1, -1):
             assert choices[gid, backtrace] >= 0
