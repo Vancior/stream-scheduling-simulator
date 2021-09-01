@@ -28,7 +28,7 @@ def test_single_node_provisioning():
     p_node.add_unscheduled_graph(g1)
     p_node.add_unscheduled_graph(g2)
     p_node.add_child(None)
-    p_node.children_slots[0] = 2
+    p_node.children_slots[0] = 3
     _, parent_scatter, child_scatters = p_node.step()
     logger.info([v.uuid for v in p_node.scheduled_vertexs])
     logger.info(parent_scatter)

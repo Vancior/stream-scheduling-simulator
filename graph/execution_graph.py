@@ -124,6 +124,9 @@ class ExecutionGraph:
                 )
         return g
 
+    def copy(self, uuid: str):
+        return self.sub_graph(set([v.uuid for v in self.get_vertexs()]), uuid)
+
     @classmethod
     def merge(cls, graph_list, uuid: str):
         g = ExecutionGraph(uuid)

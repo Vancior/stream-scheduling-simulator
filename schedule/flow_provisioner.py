@@ -171,9 +171,7 @@ class ProvisionerNode:
                     g_idx += 1
                     continue
                 # NOTE copy graph
-                graph_passed_to_children[child_idx].append(
-                    ExecutionGraph.merge([g], g.uuid)
-                )
+                graph_passed_to_children[child_idx].append(g.copy(g.uuid))
                 sorted_unscheduled_graphs.pop(g_idx)
                 # NOTE remove all vertexs in original graph, so that it will be filtered out
                 for v in g.get_vertexs():
