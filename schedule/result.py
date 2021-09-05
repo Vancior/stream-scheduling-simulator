@@ -40,7 +40,7 @@ class SchedulingResult:
         return self.assign_map.items()
 
     def check_complete(self, g: ExecutionGraph) -> bool:
-        for v in g.get_vertexs():
+        for v in g.get_vertices():
             if self.assign_map.get(v.uuid) is None:
                 return False
         return True

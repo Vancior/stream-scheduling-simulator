@@ -234,7 +234,7 @@ def gen_cut_options(g: ExecutionGraph) -> typing.List[CutOption]:
         sub_graph = g.sub_graph(s_cut, gen_uuid())
         s_cut, _, flow = min_cut(sub_graph)
         options.append(
-            CutOption(s_cut, set([v.uuid for v in g.get_vertexs()]) - s_cut, flow)
+            CutOption(s_cut, set([v.uuid for v in g.get_vertices()]) - s_cut, flow)
         )
 
     return options

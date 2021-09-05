@@ -1,0 +1,39 @@
+domains:
+- type: cloud
+  name: cloud0
+  router:
+    bd: 1000
+    delay: 5
+  hrgs:
+  - name: cloud
+    replica: 1
+    spec:
+      mips: 5000
+      cores: 1000
+      memory: 2000
+      labels:
+        machine: rack
+    switch:
+      bd: 1000
+      delay: 5
+- type: edge
+  name: edge0
+  router:
+    bd: 1000
+    delay: 5
+  hrgs:
+  - name: rasp
+    replica: 3
+    spec:
+      mips: 2000
+      cores: 1
+      memory: 1
+      labels:
+        machine: rasp
+        connector: robot
+    switch:
+      bd: 300
+      delay: 5
+interdomain:
+  bd: 10
+  delay: 50

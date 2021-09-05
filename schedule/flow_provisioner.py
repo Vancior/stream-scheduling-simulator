@@ -53,7 +53,7 @@ class ProvisionerNode:
         self.parent: ProvisionerNode = parent
         self.children: typing.List[ProvisionerNode] = []
         self.children_slots = []
-        self.scheduled_vertexs = []
+        self.scheduled_vertices = []
         self.unscheduled_graphs = []
         self.logger = get_logger(self.__class__.__name__ + "[{}]".format(self.name))
 
@@ -68,6 +68,9 @@ class ProvisionerNode:
         if scatter.unscheduled_graphs is not None:
             for g in scatter.unscheduled_graphs:
                 self.add_unscheduled_graph(g)
+        # NOTE parent already decrease child's slots, this is for not reporting decreasing again
+        if scatter.slot_diff is not None:
+            self.slot_diff += scatter.slot_diff
 
     def gather_from_child(self, child_name: str, scatter: ProvisionerScatter):
         for child_idx, child in enumerate(self.children):
@@ -88,22 +91,24 @@ class ProvisionerNode:
 
         if self.local_slots - self.node.occupied > 0:
             self.schedule_graph_with_limit(self.local_slots - self.node.occupied)
-            self.clear_empty_graphs()
-        self.logger.debug("after local scheduling: %s", self.unscheduled_graphs)
+            self.rearrange_graphs()
+        # self.logger.debug("after local scheduling: %s", self.unscheduled_graphs)
 
         if len(self.unscheduled_graphs) > 0:
             graph_passed_to_children = self.pass_graph_to_children()
-            self.clear_empty_graphs()
+            self.rearrange_graphs()
         else:
             graph_passed_to_children = [None for _ in self.children]
-        self.logger.debug("children graph: %s", graph_passed_to_children)
-        self.logger.debug("unscheduled graph: %s", self.unscheduled_graphs)
-        self.logger.debug("children slots: %s", self.children_slots)
+        # self.logger.debug("children graph: %s", graph_passed_to_children)
+        # self.logger.debug("unscheduled graph: %s", self.unscheduled_graphs)
+        # self.logger.debug("children slots: %s", self.children_slots)
         self.logger.debug("slot diff: %s", self.slot_diff)
 
         children_scatters = [ProvisionerScatter() for _ in self.children]
         for scatter, graphs in zip(children_scatters, graph_passed_to_children):
             scatter.unscheduled_graphs = graphs
+            if graphs is not None:
+                scatter.slot_diff = sum([len(g) for g in graphs])
         parent_scatter = ProvisionerScatter()
         if len(self.unscheduled_graphs) > 0:
             parent_scatter.unscheduled_graphs = self.unscheduled_graphs
@@ -121,15 +126,17 @@ class ProvisionerNode:
                 if s.domain_constraint.get("host") != self.name:
                     continue
                 assert n_slot > 0  # this has been checked in FlowScheduler
-                self.scheduled_vertexs.append(s)
+                self.scheduled_vertices.append(s)
                 assert self.node.occupy(1)
                 self.slot_diff -= 1
                 n_slot -= 1
                 g.remove_vertex(s.uuid)
+        self.rearrange_graphs()
 
         topological_sorted_graphs = [
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
         ]
+        self.logger.info([[v.uuid for v in vs] for vs in topological_sorted_graphs])
         # REVIEW upstream_bd could be replaced with exact cross-cut bd
         groups = [
             [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
@@ -141,7 +148,7 @@ class ProvisionerNode:
             v_count = groups[gid][s_idx][0]
             for vidx in range(v_count):
                 v = topological_sorted_graphs[gid][vidx]
-                self.scheduled_vertexs.append(v)
+                self.scheduled_vertices.append(v)
                 assert self.node.occupy(1)
                 self.slot_diff -= 1
                 self.unscheduled_graphs[gid].remove_vertex(v.uuid)
@@ -153,7 +160,7 @@ class ProvisionerNode:
             heapq.heappush(heap_children_slots, (-slots, idx, slots))
         # REVIEW could be sorted by (number of vertex, input bd)
         sorted_unscheduled_graphs = sorted(
-            [(g.number_of_vertexs(), g) for g in self.unscheduled_graphs],
+            [(g.number_of_vertices(), g) for g in self.unscheduled_graphs],
             key=lambda i: i[0],
             reverse=True,
         )
@@ -173,8 +180,8 @@ class ProvisionerNode:
                 # NOTE copy graph
                 graph_passed_to_children[child_idx].append(g.copy(g.uuid))
                 sorted_unscheduled_graphs.pop(g_idx)
-                # NOTE remove all vertexs in original graph, so that it will be filtered out
-                for v in g.get_vertexs():
+                # NOTE remove all vertices in original graph, so that it will be filtered out
+                for v in g.get_vertices():
                     g.remove_vertex(v.uuid)
                 self.children_slots[child_idx] -= n_vertex
                 self.slot_diff -= n_vertex
@@ -186,6 +193,8 @@ class ProvisionerNode:
                     )
                 break
         # !SECTION
+        self.rearrange_graphs()
+        self.logger.info("graphs: %s", self.unscheduled_graphs)
         # SECTION B. split graphs to remaining children slots (from large to small)
         for child_idx, child_slots in sorted(
             enumerate(self.children_slots), key=lambda e: e[1], reverse=True
@@ -249,10 +258,16 @@ class ProvisionerNode:
             backtrace -= groups[gid][solution[gid]][0]
         return solution
 
-    def clear_empty_graphs(self) -> None:
-        self.unscheduled_graphs = [
-            g for g in self.unscheduled_graphs if g.number_of_vertexs() > 0
-        ]
+    def rearrange_graphs(self) -> None:
+        self.unscheduled_graphs = reduce(
+            lambda a, b: a + b,
+            [
+                g.connected_subgraphs()
+                for g in self.unscheduled_graphs
+                if g.number_of_vertices() > 0
+            ],
+            [],
+        )
 
     def traversal(self, f) -> None:
         f(self)

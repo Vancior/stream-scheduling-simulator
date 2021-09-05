@@ -70,7 +70,7 @@ class FlowGraph:
 
 def min_cut(g: ExecutionGraph):
     nodes: typing.Dict[str, FlowGraphNode] = {
-        v.uuid: FlowGraphNode([]) for v in g.get_vertexs()
+        v.uuid: FlowGraphNode([]) for v in g.get_vertices()
     }
     edges: typing.List[FlowGraphEdge] = []
     index = 0
@@ -89,14 +89,14 @@ def min_cut(g: ExecutionGraph):
     fake_sink = gen_uuid()
     nodes[fake_source] = FlowGraphNode([])
     nodes[fake_sink] = FlowGraphNode([])
-    for s in g.get_in_vertexs():
+    for s in g.get_in_vertices():
         edges.append(FlowGraphEdge(fake_source, s.uuid, MAX_EDGE_CAPACITY, 0))
         nodes[fake_source].out_edges.append(index)
         index += 1
         edges.append(FlowGraphEdge(s.uuid, fake_source, 0, 0))
         nodes[s.uuid].out_edges.append(index)
         index += 1
-    for s in g.get_out_vertexs():
+    for s in g.get_out_vertices():
         edges.append(FlowGraphEdge(s.uuid, fake_sink, MAX_EDGE_CAPACITY, 0))
         nodes[s.uuid].out_edges.append(index)
         index += 1

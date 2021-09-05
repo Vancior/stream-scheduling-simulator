@@ -1,5 +1,6 @@
 import typing
 from typing import NamedTuple
+from utils import DisjointSet
 
 import networkx as nx
 from networkx.algorithms.dag import topological_sort
@@ -17,13 +18,16 @@ class ExecutionGraph:
 
     def __str__(self) -> str:
         return "Graph[{}][{}]".format(
-            self.uuid, ", ".join([v.uuid for v in self.get_vertexs()])
+            self.uuid, ", ".join([v.uuid for v in self.get_vertices()])
         )
 
     def __repr__(self) -> str:
         return self.__str__()
 
-    def number_of_vertexs(self) -> int:
+    def __len__(self) -> int:
+        return self.number_of_vertices()
+
+    def number_of_vertices(self) -> int:
         return self.g.number_of_nodes()
 
     def add_vertex(self, v: Vertex) -> None:
@@ -53,13 +57,13 @@ class ExecutionGraph:
     def get_vertex(self, vid: str) -> Vertex:
         return Vertex.from_networkx(vid, self.g.nodes[vid])
 
-    def get_vertexs(self) -> typing.List[Vertex]:
+    def get_vertices(self) -> typing.List[Vertex]:
         return [self.get_vertex(vid) for vid in self.g.nodes()]
 
-    def get_up_vertexs(self, vid: str) -> typing.List[Vertex]:
+    def get_up_vertices(self, vid: str) -> typing.List[Vertex]:
         return [self.get_vertex(e[0]) for e in self.g.in_edges(vid)]
 
-    def get_down_vertexs(self, vid: str) -> typing.List[Vertex]:
+    def get_down_vertices(self, vid: str) -> typing.List[Vertex]:
         return [self.get_vertex(e[1]) for e in self.g.out_edges(vid)]
 
     def get_edge(self, v_from: str, v_to: str):
@@ -69,26 +73,26 @@ class ExecutionGraph:
         return self.g.edges(data=True)
 
     def get_sources(self):
-        return [v for v in self.get_vertexs() if v.type == "source"]
+        return [v for v in self.get_vertices() if v.type == "source"]
 
     def get_sinks(self):
-        return [v for v in self.get_vertexs() if v.type == "sink"]
+        return [v for v in self.get_vertices() if v.type == "sink"]
 
     def get_operators(self):
-        return [v for v in self.get_vertexs() if v.type == "operator"]
+        return [v for v in self.get_vertices() if v.type == "operator"]
 
-    def get_in_vertexs(self):
-        return [v for v in self.get_vertexs() if self.g.in_degree(v.uuid) == 0]
+    def get_in_vertices(self):
+        return [v for v in self.get_vertices() if self.g.in_degree(v.uuid) == 0]
 
-    def get_out_vertexs(self):
-        return [v for v in self.get_vertexs() if self.g.out_degree(v.uuid) == 0]
+    def get_out_vertices(self):
+        return [v for v in self.get_vertices() if self.g.out_degree(v.uuid) == 0]
 
     def topological_order(self) -> typing.List[Vertex]:
         return [self.get_vertex(vid) for vid in topological_sort(self.g)]
 
     def topological_order_with_upstream_bd(self) -> typing.List[Vertex]:
         new_g = nx.DiGraph()
-        for v in self.get_vertexs():
+        for v in self.get_vertices():
             new_g.add_node(v.uuid, upstream_bd=v.upstream_bd)
         for v_from, v_to, data in self.get_edges():
             new_g.add_edge(v_from, v_to, bd=data["unit_size"] * data["per_second"])
@@ -110,12 +114,12 @@ class ExecutionGraph:
 
         return [self.get_vertex(vid) for vid in v_seq]
 
-    def sub_graph(self, nids: typing.Set[str], uuid: str):
+    def sub_graph(self, vids: typing.Set[str], uuid: str):
         g = ExecutionGraph(uuid)
-        for nid in nids:
+        for nid in vids:
             g.add_vertex(self.get_vertex(nid))
         for e in self.get_edges():
-            if e[0] in nids and e[1] in nids:
+            if e[0] in vids and e[1] in vids:
                 g.connect(
                     self.get_vertex(e[0]),
                     self.get_vertex(e[1]),
@@ -124,8 +128,25 @@ class ExecutionGraph:
                 )
         return g
 
+    def connected_subgraphs(self) -> typing.List:
+        d_set = DisjointSet(self.number_of_vertices())
+        vertex_indexes = {v.uuid: i for i, v in enumerate(self.get_vertices())}
+        for u, v, _ in self.get_edges():
+            d_set.union(vertex_indexes[u], vertex_indexes[v])
+        roots = list(d_set.unique_roots())
+
+        if len(roots) == 1:
+            return [self]
+        vertex_sets = {root: set() for root in roots}
+        for vid, idx in vertex_indexes.items():
+            vertex_sets[d_set.find(idx)].add(vid)
+        return [
+            self.sub_graph(vids, self.uuid + "_" + str(i))
+            for i, vids in enumerate(vertex_sets.values())
+        ]
+
     def copy(self, uuid: str):
-        return self.sub_graph(set([v.uuid for v in self.get_vertexs()]), uuid)
+        return self.sub_graph(set([v.uuid for v in self.get_vertices()]), uuid)
 
     @classmethod
     def merge(cls, graph_list, uuid: str):

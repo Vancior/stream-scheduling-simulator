@@ -35,7 +35,7 @@ class LatencyCalculator:
                 d["unit_size"] * d["per_second"],
             )
         # this has been executed in scheduler
-        # for v in graph.get_vertexs():
+        # for v in graph.get_vertices():
         #     self.topo.occupy_node(result.get_scheduled_node(v.uuid))
 
     def compute_latency(self) -> typing.Dict[str, int]:
@@ -48,14 +48,14 @@ class LatencyCalculator:
         latency_dict = {}
         last_vid = None
         for v in g.graph.topological_order():
-            up_vertexs = g.graph.get_up_vertexs(v.uuid)
-            node_lat = [latency_dict[u.uuid] for u in up_vertexs]
+            up_vertices = g.graph.get_up_vertices(v.uuid)
+            node_lat = [latency_dict[u.uuid] for u in up_vertices]
             intri_lat = [
                 self.topo.get_n2n_intrinsic_latency(
                     g.result.get_scheduled_node(u.uuid),
                     g.result.get_scheduled_node(v.uuid),
                 )
-                for u in up_vertexs
+                for u in up_vertices
             ]
             trans_lat = [
                 self.topo.get_n2n_transmission_latency(
@@ -65,7 +65,7 @@ class LatencyCalculator:
                     g.graph.get_edge(u.uuid, v.uuid)["unit_size"]
                     * g.graph.get_edge(u.uuid, v.uuid)["per_second"],
                 )
-                for u in up_vertexs
+                for u in up_vertices
             ]
             # TODO: configurable latency aggregation
             up_latency = avg(*[sum(i) for i in zip(node_lat, intri_lat, trans_lat)])
@@ -78,7 +78,10 @@ class LatencyCalculator:
                 str(
                     list(
                         zip(
-                            [i.uuid for i in up_vertexs], node_lat, intri_lat, trans_lat
+                            [i.uuid for i in up_vertices],
+                            node_lat,
+                            intri_lat,
+                            trans_lat,
                         )
                     )
                 ),
