@@ -53,7 +53,7 @@ class GraphGenerator:
         total_level = self.gen_args["graph_length"]
         g = ExecutionGraph(self.name)
 
-        v_source = Vertex(
+        v_source = Vertex.from_spec(
             "{}-v{}".format(self.name, 1),
             "source",
             {"host": random.choice(self.gen_args["source_hosts"])},
@@ -63,7 +63,7 @@ class GraphGenerator:
             self.gen_args["memory_cb"](),
         )
         g.add_vertex(v_source)
-        v_sink = Vertex(
+        v_sink = Vertex.from_spec(
             "{}-v{}".format(self.name, total_level),
             "sink",
             {"host": random.choice(self.gen_args["sink_hosts"])},
@@ -77,7 +77,7 @@ class GraphGenerator:
         last_vertex = v_source
         current_v_idx = 2
         while current_v_idx < total_level:
-            v = Vertex(
+            v = Vertex.from_spec(
                 "{}-v{}".format(self.name, current_v_idx),
                 "operator",
                 {},
@@ -88,11 +88,17 @@ class GraphGenerator:
             )
             g.add_vertex(v)
             if last_vertex == v_source:
+                size = self.gen_args["unit_size_cb"]()
+                rate = self.gen_args["unit_rate_cb"]() * 100
+                print("graph {} source bd {}".format(g.uuid, size * rate / 1e6))
                 g.connect(
                     last_vertex,
                     v,
-                    self.gen_args["unit_size_cb"](),
-                    self.gen_args["unit_rate_cb"]() + self.gen_args["unit_rate_cb"](),
+                    size,
+                    rate
+                    # self.gen_args["unit_size_cb"](),
+                    # NOTE 5x data density for source
+                    # self.gen_args["unit_rate_cb"]() * 100,
                 )
             else:
                 g.connect(

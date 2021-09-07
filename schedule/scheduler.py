@@ -7,9 +7,9 @@ from functools import partial
 
 from graph import ExecutionGraph
 from topo import Domain, Scenario, Topology
-from utils import get_logger
+from utils import gen_uuid, get_logger
 
-from .result import SchedulingResult
+from .result import SchedulingResult, SchedulingResultStatus
 
 
 class Scheduler(ABC):
@@ -21,13 +21,13 @@ class Scheduler(ABC):
 
     @abstractmethod
     def schedule(self, g: ExecutionGraph) -> SchedulingResult:
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @abstractmethod
     def schedule_multiple(
         self, graph_list: typing.List[ExecutionGraph]
     ) -> typing.List[SchedulingResult]:
-        pass
+        raise NotImplementedError()
 
     def if_source_in_single_domain(self, g: ExecutionGraph) -> typing.Optional[Domain]:
         domain_set = set()
@@ -39,10 +39,13 @@ class Scheduler(ABC):
             return self.scenario.find_domain(list(domain_set)[0])
         return None
 
-    def if_source_fit(self, g: ExecutionGraph, domain: Domain) -> bool:
+    def if_source_fit(
+        self, graph_list: typing.List[ExecutionGraph], domain: Domain
+    ) -> bool:
         host_vertex_count = defaultdict(int)
-        for s in g.get_sources():
-            host_vertex_count[s.domain_constraint["host"]] += 1
+        for g in graph_list:
+            for s in g.get_sources():
+                host_vertex_count[s.domain_constraint["host"]] += 1
 
         for hostname, count in host_vertex_count.items():
             host = domain.find_host(hostname)
@@ -59,18 +62,21 @@ class Scheduler(ABC):
 
 
 class RandomScheduler(Scheduler):
-    def schedule(self, g: ExecutionGraph, topo: Topology) -> SchedulingResult:
+    def schedule(self, graph: ExecutionGraph, topo: Topology) -> SchedulingResult:
         """schedule vertex in topological order (source would be scheduled first)"""
 
-        if len(g.get_sources()) > 0:
-            edge_domain = self.if_source_in_single_domain(g)
+        if len(graph.get_sources()) > 0:
+            edge_domain = self.if_source_in_single_domain(graph)
             if edge_domain is None:
                 return SchedulingResult.failed("sources not in single domain")
-            if not self.if_source_fit(g, edge_domain):
+            if not self.if_source_fit([graph], edge_domain):
                 return SchedulingResult.failed("insufficient resource for sources")
 
         result = SchedulingResult()
-        for v in g.topological_order():
+        ordered_vertices = (
+            graph.get_sources() + graph.get_operators() + graph.get_sinks()
+        )
+        for v in ordered_vertices:
             nid_list = list(
                 filter(
                     partial(topo.slot_filter, 1),
@@ -81,7 +87,9 @@ class RandomScheduler(Scheduler):
                 )
             )
             if len(nid_list) == 0:
-                return SchedulingResult.failed("no available host")
+                return SchedulingResult.failed(
+                    "no available host for {}".format(v.uuid)
+                )
             nid = random.choice(nid_list)
             self.logger.debug("Select node %s for vertex %s", nid, v.uuid)
             result.assign(nid, v.uuid)
@@ -90,6 +98,16 @@ class RandomScheduler(Scheduler):
         return result
 
     def schedule_multiple(
-        self, graph_list: typing.List[ExecutionGraph]
+        self, graph_list: typing.List[ExecutionGraph], topo: Topology
     ) -> typing.List[SchedulingResult]:
-        return [self.schedule(g) for g in graph_list]
+        big_graph = ExecutionGraph.merge(graph_list, gen_uuid())
+        big_result = self.schedule(big_graph, topo)
+        if big_result.status == SchedulingResultStatus.FAILED:
+            return [
+                SchedulingResult(big_result.status, big_result.reason)
+                for _ in graph_list
+            ]
+        return [
+            big_result.extract(set([v.uuid for v in g.get_vertices()]))
+            for g in graph_list
+        ]

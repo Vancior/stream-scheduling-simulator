@@ -7,7 +7,7 @@ from graph import ExecutionGraph, Vertex
 from topo import Node, Scenario
 from utils import gen_uuid, get_logger
 
-from .flow_provisioner import ProvisionerNode, TopologicalResourceProvisioner
+from .flow_provisioner import ProvisionNode, TopologicalProvisioner
 
 logger = get_logger("Provisioner Test")
 
@@ -18,7 +18,7 @@ def test_single_node_provisioning():
     node = Node.from_spec(
         gen_uuid(), "host", 1000, 4, n_slot * int(2e8), 0, 0, {"host": "rasp1"}
     )
-    p_node = ProvisionerNode("rasp1", "host", node, None)
+    p_node = ProvisionNode("rasp1", "host", node, None)
     p_node.slot_diff = 0
     p_node.logger.setLevel(logging.DEBUG)
 
@@ -53,7 +53,7 @@ def test_initial_balancing():
             Loader=yaml.Loader,
         )
     )
-    provisioner = TopologicalResourceProvisioner(sc.get_edge_domains()[0])
+    provisioner = TopologicalProvisioner(sc.get_edge_domains()[0])
     # provisioner.tree.traversal(
     #     lambda n: logger.info("%s, %s, %s", n.name, n.local_slots, n.children_slots)
     # )
@@ -71,7 +71,7 @@ def test_branch_offloading():
             Loader=yaml.Loader,
         )
     )
-    provisioner = TopologicalResourceProvisioner(sc.get_edge_domains()[0])
+    provisioner = TopologicalProvisioner(sc.get_edge_domains()[0])
     provisioner.tree.traversal(
         lambda n: logger.info(
             "%s, %s, %s", n.name, n.local_slots - n.node.occupied, n.children_slots

@@ -2,45 +2,61 @@ import random
 import typing
 from collections import defaultdict, namedtuple
 
-import numpy as np
 from algo import min_cut
 from graph import ExecutionGraph
-from topo import Domain, Topology
-from utils import gen_uuid
+from topo import Domain, Scenario
+from utils import gen_uuid, grouped_exactly_one_binpack
 
+from .flow_provisioner import TopologicalProvisioner
+from .provision import Provisioner
 from .result import SchedulingResult, SchedulingResultStatus
 from .scheduler import RandomScheduler, Scheduler
-
-MAX_FLOW = int(1e18)
 
 SourcedGraph = namedtuple("SourcedGraph", ["idx", "g"])
 
 
 class FlowScheduler(Scheduler):
-    def schedule(self, g: ExecutionGraph, topo: Topology = None) -> SchedulingResult:
+    provisioner_map: typing.Dict[str, Provisioner]
+
+    def __init__(self, scenario: Scenario, provision_type: str = "topo") -> None:
+        super().__init__(scenario)
+        self.init_provisioner(provision_type)
+
+    def init_provisioner(self, provision_type: str = "topo") -> None:
+        def provisioner_creator(domain: Domain):
+            if provision_type == "topo":
+                return TopologicalProvisioner(domain)
+            raise ValueError("unknown provision type")
+
+        self.provisioner_map = {
+            d.name: provisioner_creator(d) for d in self.scenario.domains
+        }
+
+    def get_provisioner(self, domain_name: str) -> Provisioner:
+        assert self.provisioner_map.get(domain_name) is not None
+        return self.provisioner_map.get(domain_name)
+
+    def schedule(self, graph: ExecutionGraph) -> SchedulingResult:
         # A. if sources not fit into hosts, reject
         # B. do min-cut on g into S & T
-        # C. if |S| > edge slots, goto D, else goto E
-        # D1. incrementally do min-cut on S to until it fits
-        # E. random schedule S & T
+        # C. find the smallest flow that s-cut can fit into edge slots
+        # D. random schedule S & T
 
-        random_scheduler = RandomScheduler(self.scenario)
+        # NOTE operators should not have domain constraint
+        if len(graph.get_sources()) == 0:
+            return self.get_provisioner(
+                random.choice(self.scenario.get_cloud_domains()).name
+            ).schedule(graph)
 
-        # NOTE: operators should not have domain constraint
-        if len(g.get_sources()) == 0:
-            return random_scheduler.schedule(
-                g, random.choice(self.scenario.get_cloud_domains()).topo
-            )
-
-        edge_domain = self.if_source_in_single_domain(g)
+        edge_domain = self.if_source_in_single_domain(graph)
         if edge_domain is None:
             return SchedulingResult.failed("sources not in single domain")
-        if not self.if_source_fit(g, edge_domain):
+        if not self.if_source_fit(graph, edge_domain):
             return SchedulingResult.failed("insufficient resource for sources")
 
         free_slots = sum([n.slots - n.occupied for n in edge_domain.topo.get_nodes()])
 
-        cut_options = sorted(gen_cut_options(g), key=lambda o: o.flow)
+        cut_options = sorted(gen_cut_options(graph), key=lambda o: o.flow)
         cut_choice: CutOption = None
         for option in cut_options:
             if len(option.s_cut) <= free_slots:
@@ -50,7 +66,13 @@ class FlowScheduler(Scheduler):
             return SchedulingResult.failed("slots not enough")
         s_cut, t_cut = cut_choice.s_cut, cut_choice.t_cut
 
-        result = self.random_schedule(g, s_cut, t_cut, edge_domain)
+        s_result = self.get_provisioner(edge_domain.name).schedule(
+            graph.sub_graph(s_cut, gen_uuid())
+        )
+        t_result = self.get_provisioner(
+            random.choice(self.scenario.get_cloud_domains()).name
+        ).schedule(graph.sub_graph(t_cut, gen_uuid()))
+        result = SchedulingResult.merge(s_result, t_result)
         if result.status != SchedulingResultStatus.FAILED:
             self.logger.info(
                 "free slots: %d; newly occupied: %d", free_slots, len(s_cut)
@@ -63,20 +85,21 @@ class FlowScheduler(Scheduler):
         results = [None for _ in graph_list]
         # result_s = [0 for _ in graph_list]
 
-        # NOTE: schedule non-contraint graph to cloud
+        # NOTE schedule non-contrained graphs to cloud
         for idx, g in enumerate(graph_list):
             if len(g.get_sources()) == 0:
                 results[idx] = RandomScheduler(self.scenario).schedule(
                     g, random.choice(self.scenario.get_cloud_domains()).topo
                 )
 
+        # NOTE continue algorithm for contrained graphs
         sourced_graphs: typing.List[SourcedGraph] = [
             SourcedGraph(idx, g)
             for idx, g in enumerate(graph_list)
             if g.get_sources() != 0
         ]
 
-        # NOTE: group graphs by edge domains
+        # NOTE group graphs by edge domains
         edge_domain_map: typing.Dict[str, typing.List[SourcedGraph]] = defaultdict(list)
         for sg in sourced_graphs:
             edge_domain = self.if_source_in_single_domain(sg.g)
@@ -84,20 +107,20 @@ class FlowScheduler(Scheduler):
                 results[sg.idx] = SchedulingResult.failed(
                     "sources not in single domain"
                 )
-            # REVIEW: should be checked combined
-            if not self.if_source_fit(sg.g, edge_domain):
-                results[sg.idx] = SchedulingResult.failed(
-                    "insufficient resource for sources"
-                )
             edge_domain_map[edge_domain.name].append(sg)
 
-        # NOTE: for each edge domain
+        # NOTE for each edge domain
         for domain_name, sg_list in edge_domain_map.items():
             edge_domain = self.scenario.find_domain(domain_name)
-            if edge_domain is None:
+            assert edge_domain is not None
+            if not self.if_source_fit([sg.g for sg in sg_list], edge_domain):
+                for sg in sg_list:
+                    results[sg.idx] = SchedulingResult.failed(
+                        "insufficient resource for sources"
+                    )
                 continue
 
-            # NOTE: generate cut options, if no option provided, skip this edge domain
+            # NOTE generate cut options, if no option provided, skip this edge domain
             graph_cut_options: typing.List[typing.List[CutOption]] = [
                 sorted(gen_cut_options(sg.g), key=lambda o: o.flow) for sg in sg_list
             ]
@@ -118,105 +141,54 @@ class FlowScheduler(Scheduler):
                 )
                 <= free_slots
             ):
-                # NOTE: if slots are enough for min-cut
-                s_graph_list = []
-                for sg, options in zip(sg_list, graph_cut_options):
-                    s_graph_list.append(sg.g.sub_graph(options[0].s_cut, gen_uuid()))
-                big_s_graph = ExecutionGraph.merge(s_graph_list, gen_uuid())
-                big_result = RandomScheduler(self.scenario).schedule(
-                    big_s_graph, edge_domain.topo
-                )
-                for sg, options in zip(sg_list, graph_cut_options):
-                    s_result = big_result.extract(options[0].s_cut)
-                    t_result = RandomScheduler(self.scenario).schedule(
-                        sg.g.sub_graph(options[0].t_cut),
-                        random.choice(self.scenario.get_cloud_domains()).topo,
-                    )
-                    results[sg.idx] = SchedulingResult.merge(s_result, t_result)
-            else:
-                dp = np.full((free_slots + 1,), MAX_FLOW, dtype=np.int64)
-                selected = np.full((free_slots + 1,), -1, dtype=np.int32)
-                selected[0] = 0
-                choices = np.full((len(sg_list), free_slots + 1), -1, dtype=np.int32)
-                dp[0] = 0
-                for idx, sg in enumerate(sg_list):
-                    options = graph_cut_options[idx]
-                    for capacity in range(free_slots, -1, -1):
-                        for o_idx, option in enumerate(options):
-                            volume = len(option.s_cut)
-                            if volume > capacity:
-                                continue
-                            # NOTE: if previous groups are selected
-                            # NOTE: if selected[capacity] not be overwrited at this round, it cannot be used at next round
-                            if selected[capacity - volume] == idx and (
-                                dp[capacity - volume] + option.flow < dp[capacity]
-                                or selected[capacity] <= idx
-                            ):
-                                dp[capacity] = dp[capacity - volume] + option.flow
-                                selected[capacity] = idx + 1
-                                choices[idx, capacity] = o_idx
-                # print(dp)
-                # print(selected)
-                # print(choices)
-                valid_idx = np.where(selected == len(sg_list))[0]
-                backtrace = valid_idx[dp[valid_idx].argmin()]
-                # print(backtrace)
-                option_choice: typing.List[CutOption] = [
-                    None for _ in range(len(sg_list))
+                # NOTE if slots are enough for min-cut
+                s_graph_list: typing.List[ExecutionGraph] = [
+                    sg.g.sub_graph(options[0].s_cut, gen_uuid())
+                    for sg, options in zip(sg_list, graph_cut_options)
                 ]
-                for i in range(len(sg_list) - 1, -1, -1):
-                    if choices[i, backtrace] < 0:
-                        self.logger.error("malicious result")
-                        continue
-                    option_choice[i] = graph_cut_options[i][choices[i, backtrace]]
-                    backtrace -= len(option_choice[i].s_cut)
+                t_graph_list: typing.List[ExecutionGraph] = [
+                    sg.g.sub_graph(options[0].t_cut, gen_uuid())
+                    for sg, options in zip(sg_list, graph_cut_options)
+                ]
+                self.logger.info("graph_cutting: best")
+            else:
+                groups = [
+                    [(len(option.s_cut), option.flow) for option in options]
+                    for options in graph_cut_options
+                ]
+                solution = grouped_exactly_one_binpack(free_slots, groups)
+                s_graph_list: typing.List[ExecutionGraph] = [
+                    sg.g.sub_graph(options[s_idx].s_cut, gen_uuid())
+                    for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
+                ]
+                t_graph_list: typing.List[ExecutionGraph] = [
+                    sg.g.sub_graph(options[s_idx].t_cut, gen_uuid())
+                    for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
+                ]
+                self.logger.info("graph_cutting: binpack")
 
-                s_graph_list = []
-                for sg, option in zip(sg_list, option_choice):
-                    if option is None:
-                        self.logger.error("malicious option")
-                        continue
-                    s_graph_list.append(sg.g.sub_graph(option.s_cut, gen_uuid()))
-                big_s_graph = ExecutionGraph.merge(s_graph_list, gen_uuid())
-                big_result = RandomScheduler(self.scenario).schedule(
-                    big_s_graph, edge_domain.topo
-                )
-                for sg, option in zip(sg_list, option_choice):
-                    if option is None:
-                        continue
-                    s_result = big_result.extract(option.s_cut)
-                    t_result = RandomScheduler(self.scenario).schedule(
-                        sg.g.sub_graph(option.t_cut, gen_uuid()),
-                        random.choice(self.scenario.get_cloud_domains()).topo,
-                    )
-                    results[sg.idx] = SchedulingResult.merge(s_result, t_result)
-                    # result_s[sg.idx] = len(option.s_cut)
+            self.logger.info(
+                "s_graph_list: %s", [g.number_of_vertices() for g in s_graph_list]
+            )
+            self.logger.info(
+                "t_graph_list: %s", [g.number_of_vertices() for g in t_graph_list]
+            )
+            s_result_list = self.get_provisioner(domain_name).schedule_multiple(
+                s_graph_list
+            )
+            # self.logger.info("s_result_list: %s", s_result_list)
+            t_result_list = [
+                self.get_provisioner(
+                    random.choice(self.scenario.get_cloud_domains()).name
+                ).schedule(g)
+                for g in t_graph_list
+            ]
+            # self.logger.info("t_result_list: %s", t_result_list)
+
+            for sg, s_result, t_result in zip(sg_list, s_result_list, t_result_list):
+                results[sg.idx] = SchedulingResult.merge(s_result, t_result)
         # print(result_s)
         return results
-
-    def random_schedule(
-        self,
-        g: ExecutionGraph,
-        s_cut: typing.Set[str],
-        t_cut: typing.Set[str],
-        edge_domain: Domain,
-    ) -> SchedulingResult:
-        random_scheduler = RandomScheduler(self.scenario)
-        random_scheduler.logger.setLevel(self.logger.getEffectiveLevel())
-        s_result = random_scheduler.schedule(
-            g.sub_graph(s_cut, gen_uuid()), edge_domain.topo
-        )
-        if s_result.status == SchedulingResultStatus.FAILED:
-            return SchedulingResult.failed(s_result.reason)
-        random_scheduler.logger.setLevel(self.logger.getEffectiveLevel())
-        t_result = random_scheduler.schedule(
-            g.sub_graph(t_cut, gen_uuid()),
-            random.choice(self.scenario.get_cloud_domains()).topo,
-        )
-        if t_result.status == SchedulingResultStatus.FAILED:
-            return SchedulingResult.failed(t_result.reason)
-
-        return SchedulingResult.merge(s_result, t_result)
 
 
 class CutOption(typing.NamedTuple):

@@ -5,6 +5,8 @@ SLOT_MEMORY_SIZE = int(2e8)
 
 
 class Node:
+    uuid: str
+
     def __init__(self, uuid, data):
         self.uuid = uuid
         self.data = data

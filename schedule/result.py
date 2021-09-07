@@ -30,6 +30,9 @@ class SchedulingResult:
             return self.assign_map.__str__()
         return {"status": self.status.__str__(), "reason": self.reason}
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def assign(self, nid: str, vid: str):
         self.assign_map[vid] = nid
 
@@ -56,6 +59,8 @@ class SchedulingResult:
     def merge(cls, *results):
         merged_result = SchedulingResult()
         for r in results:
+            if r.status == SchedulingResultStatus.FAILED:
+                return SchedulingResult.failed(r.reason)
             for k, v in r.get_assignments():
                 merged_result.assign(v, k)
         return merged_result

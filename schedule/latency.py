@@ -72,21 +72,21 @@ class LatencyCalculator:
             latency_dict[v.uuid] = up_latency + self.topo.get_computation_latency(
                 g.result.get_scheduled_node(v.uuid), g.graph.get_vertex(v.uuid).mi
             )
-            self.logger.debug(
-                "vertex %s: %s, com %d",
-                v.uuid,
-                str(
-                    list(
-                        zip(
-                            [i.uuid for i in up_vertices],
-                            node_lat,
-                            intri_lat,
-                            trans_lat,
-                        )
-                    )
-                ),
-                latency_dict[v.uuid] - up_latency,
-            )
+            # self.logger.info(
+            #     "vertex %s: %s, com %d",
+            #     v.uuid,
+            #     str(
+            #         list(
+            #             zip(
+            #                 [i.uuid for i in up_vertices],
+            #                 node_lat,
+            #                 intri_lat,
+            #                 trans_lat,
+            #             )
+            #         )
+            #     ),
+            #     latency_dict[v.uuid] - up_latency,
+            # )
             last_vid = v.uuid
 
         if last_vid is None:

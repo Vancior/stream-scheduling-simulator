@@ -123,7 +123,10 @@ class Topology:
         i = 0
         while i < len(path) - 1:
             e = self.g.edges[(path[i], path[i + 1])]
-            total += int((unit_size / (e["bd"] / e["occupied"] * bd)) * 1000)
+            dedicated_bd = e["bd"] / e["occupied"] * bd
+            # total += int((unit_size / (e["bd"] / e["occupied"] * bd)) * 1000)
+            total += int(unit_size * 1000 / dedicated_bd)
+            # print("size {}, bd {}, total {}".format(unit_size, dedicated_bd, total))
             i += 1
         return total
 

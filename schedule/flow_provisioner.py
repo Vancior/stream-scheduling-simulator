@@ -1,22 +1,18 @@
 import heapq
 import logging
-import time
+import random
 import typing
-from collections import defaultdict
 from functools import reduce
 
-import numpy as np
-from graph import ExecutionGraph
+from graph import ExecutionGraph, Vertex
 from topo import Domain, Host, Node, Topology
-from utils import gen_uuid, get_logger
+from utils import gen_uuid, get_logger, grouped_exactly_one_binpack
 
-from schedule import SchedulingResult
-from schedule.flow_scheduler import MAX_FLOW
-
-MAX_FLOW = int(1e18)
+from .provision import Provisioner
+from .result import SchedulingResult
 
 
-class ProvisionerScatter:
+class ProvisionScatter:
     unscheduled_graphs: typing.List[ExecutionGraph]
     slot_diff: int
 
@@ -38,9 +34,10 @@ class ProvisionerScatter:
         return self.unscheduled_graphs is None and self.slot_diff is None
 
 
-class ProvisionerNode:
-    unscheduled_graphs: typing.List[ExecutionGraph]
+class ProvisionNode:
     logger: logging.Logger
+    scheduled_vertices: typing.List[Vertex]
+    unscheduled_graphs: typing.List[ExecutionGraph]
 
     def __init__(
         self, name: str, type: str, node: Node, parent: typing.Optional[Node]
@@ -50,8 +47,8 @@ class ProvisionerNode:
         self.node = node
         self.local_slots = node.slots
         self.slot_diff = self.local_slots
-        self.parent: ProvisionerNode = parent
-        self.children: typing.List[ProvisionerNode] = []
+        self.parent: ProvisionNode = parent
+        self.children: typing.List[ProvisionNode] = []
         self.children_slots = []
         self.scheduled_vertices = []
         self.unscheduled_graphs = []
@@ -64,7 +61,7 @@ class ProvisionerNode:
     def add_unscheduled_graph(self, g: ExecutionGraph) -> None:
         self.unscheduled_graphs.append(g)
 
-    def gather_from_parent(self, scatter: ProvisionerScatter):
+    def gather_from_parent(self, scatter: ProvisionScatter):
         if scatter.unscheduled_graphs is not None:
             for g in scatter.unscheduled_graphs:
                 self.add_unscheduled_graph(g)
@@ -72,7 +69,7 @@ class ProvisionerNode:
         if scatter.slot_diff is not None:
             self.slot_diff += scatter.slot_diff
 
-    def gather_from_child(self, child_name: str, scatter: ProvisionerScatter):
+    def gather_from_child(self, child_name: str, scatter: ProvisionScatter):
         for child_idx, child in enumerate(self.children):
             if child.name != child_name:
                 continue
@@ -85,7 +82,7 @@ class ProvisionerNode:
 
     def step(
         self,
-    ) -> typing.Tuple[bool, ProvisionerScatter, typing.List[ProvisionerScatter]]:
+    ) -> typing.Tuple[bool, ProvisionScatter, typing.List[ProvisionScatter]]:
         if len(self.unscheduled_graphs) == 0 and self.slot_diff == 0:
             return False, None, None
 
@@ -102,14 +99,14 @@ class ProvisionerNode:
         # self.logger.debug("children graph: %s", graph_passed_to_children)
         # self.logger.debug("unscheduled graph: %s", self.unscheduled_graphs)
         # self.logger.debug("children slots: %s", self.children_slots)
-        self.logger.debug("slot diff: %s", self.slot_diff)
+        # self.logger.debug("slot diff: %s", self.slot_diff)
 
-        children_scatters = [ProvisionerScatter() for _ in self.children]
+        children_scatters = [ProvisionScatter() for _ in self.children]
         for scatter, graphs in zip(children_scatters, graph_passed_to_children):
             scatter.unscheduled_graphs = graphs
             if graphs is not None:
                 scatter.slot_diff = sum([len(g) for g in graphs])
-        parent_scatter = ProvisionerScatter()
+        parent_scatter = ProvisionScatter()
         if len(self.unscheduled_graphs) > 0:
             parent_scatter.unscheduled_graphs = self.unscheduled_graphs
             self.unscheduled_graphs = []
@@ -136,22 +133,23 @@ class ProvisionerNode:
         topological_sorted_graphs = [
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
         ]
-        self.logger.info([[v.uuid for v in vs] for vs in topological_sorted_graphs])
+        # self.logger.info([[v.uuid for v in vs] for vs in topological_sorted_graphs])
         # REVIEW upstream_bd could be replaced with exact cross-cut bd
         groups = [
             [(v_count, v.upstream_bd) for v_count, v in enumerate(vs)]
             + [(len(vs), vs[len(vs) - 1].downstream_bd)]
             for vs in topological_sorted_graphs
         ]
-        solution = self.grouped_exactly_one_binpack(n_slot, groups)
-        for gid, s_idx in enumerate(solution):
-            v_count = groups[gid][s_idx][0]
+        solution = grouped_exactly_one_binpack(n_slot, groups)
+        for g_idx, s_idx in enumerate(solution):
+            v_count = groups[g_idx][s_idx][0]
             for vidx in range(v_count):
-                v = topological_sorted_graphs[gid][vidx]
+                v = topological_sorted_graphs[g_idx][vidx]
                 self.scheduled_vertices.append(v)
+                # self.logger.info("schedule %s to %s", v.uuid, self.name)
                 assert self.node.occupy(1)
                 self.slot_diff -= 1
-                self.unscheduled_graphs[gid].remove_vertex(v.uuid)
+                self.unscheduled_graphs[g_idx].remove_vertex(v.uuid)
 
     def pass_graph_to_children(self) -> typing.List[typing.List[ExecutionGraph]]:
         # SECTION A. schedule whole graphs
@@ -194,7 +192,7 @@ class ProvisionerNode:
                 break
         # !SECTION
         self.rearrange_graphs()
-        self.logger.info("graphs: %s", self.unscheduled_graphs)
+        # self.logger.info("graphs: %s", self.unscheduled_graphs)
         # SECTION B. split graphs to remaining children slots (from large to small)
         for child_idx, child_slots in sorted(
             enumerate(self.children_slots), key=lambda e: e[1], reverse=True
@@ -210,53 +208,24 @@ class ProvisionerNode:
                 + [(len(vs), vs[len(vs) - 1].downstream_bd)]
                 for vs in topological_sorted_graphs
             ]
-            solution = self.grouped_exactly_one_binpack(child_slots, groups)
-            for gid, eid in enumerate(solution):
-                v_count = groups[gid][eid][0]
+            solution = grouped_exactly_one_binpack(child_slots, groups)
+            for graph, vertices, group, s_idx in zip(
+                self.unscheduled_graphs, topological_sorted_graphs, groups, solution
+            ):
+                v_count = group[s_idx][0]
                 if v_count == 0:
                     continue
-                vertex_cut = set(
-                    [topological_sorted_graphs[gid][i].uuid for i in range(v_count)]
-                )
+                vertex_cut = set([vertices[i].uuid for i in range(v_count)])
                 graph_passed_to_children[child_idx].append(
-                    self.unscheduled_graphs[gid].sub_graph(vertex_cut, gen_uuid())
+                    graph.sub_graph(vertex_cut, gen_uuid())
                 )
                 for v in vertex_cut:
-                    self.unscheduled_graphs[gid].remove_vertex(v)
+                    graph.remove_vertex(v)
                 self.children_slots[child_idx] -= v_count
                 self.slot_diff -= v_count
+            self.rearrange_graphs()
         # !SECTION
         return graph_passed_to_children
-
-    def grouped_exactly_one_binpack(
-        self, n_slot: int, groups: typing.List[typing.List[typing.Tuple[int, int]]]
-    ) -> typing.List[int]:
-        dp = np.full((n_slot + 1,), MAX_FLOW, dtype=np.int64)
-        selected = np.full((n_slot + 1,), -1, dtype=np.int32)
-        selected[0] = 0
-        choices = np.full((len(groups), n_slot + 1), -1, dtype=np.int32)
-        dp[0] = 0
-        for gid, group in enumerate(groups):
-            for capacity in range(n_slot, -1, -1):
-                for eid, ele in enumerate(group):
-                    volume, value = ele
-                    if capacity < volume:
-                        continue
-                    if selected[capacity - volume] == gid and (
-                        dp[capacity - volume] + value < dp[capacity]
-                        or selected[capacity] <= gid
-                    ):
-                        dp[capacity] = dp[capacity - volume] + value
-                        selected[capacity] = gid + 1
-                        choices[gid, capacity] = eid
-        valid_idx = np.where(selected == len(groups))[0]
-        backtrace = valid_idx[-1]
-        solution: typing.List[int] = [None for _ in range(len(groups))]
-        for gid in range(len(groups) - 1, -1, -1):
-            assert choices[gid, backtrace] >= 0
-            solution[gid] = choices[gid, backtrace]
-            backtrace -= groups[gid][solution[gid]][0]
-        return solution
 
     def rearrange_graphs(self) -> None:
         self.unscheduled_graphs = reduce(
@@ -275,18 +244,18 @@ class ProvisionerNode:
             child.traversal(f)
 
 
-class ProvisionerTree:
-    name_lookup_map: typing.Dict[str, ProvisionerNode]
+class ProvisionTree:
+    name_lookup_map: typing.Dict[str, ProvisionNode]
 
-    def __init__(self, root: ProvisionerNode) -> None:
+    def __init__(self, root: ProvisionNode) -> None:
         self.name_lookup_map = {}
         self.root = root
         self.add_node(root)
 
-    def add_node(self, node: ProvisionerNode) -> None:
+    def add_node(self, node: ProvisionNode) -> None:
         self.name_lookup_map[node.name] = node
 
-    def get_node(self, name: str) -> typing.Optional[ProvisionerNode]:
+    def get_node(self, name: str) -> typing.Optional[ProvisionNode]:
         return self.name_lookup_map.get(name)
 
     def step(self) -> bool:
@@ -312,22 +281,30 @@ class ProvisionerTree:
         self.root.traversal(f)
 
 
-class TopologicalResourceProvisioner:
+class TopologicalProvisioner(Provisioner):
     domain: Domain
     topo: Topology
-    tree: ProvisionerTree
+    tree: ProvisionTree
 
     def __init__(self, domain: Domain) -> None:
-        self.domain = domain
+        super().__init__(domain)
         self.topo = domain.topo
         self.tree = self.build_provisioner_tree()
         # NOTE initial propagation for slots
         self.rebalance()
 
+    def schedule(self, graph: ExecutionGraph) -> SchedulingResult:
+        self.initial_graph_placement(graph)
+        self.rebalance()
+        return self.gather_scheduling_result(graph)
+
     def schedule_multiple(
         self, graph_list: typing.List[ExecutionGraph]
-    ) -> SchedulingResult:
-        pass
+    ) -> typing.List[SchedulingResult]:
+        for g in graph_list:
+            self.initial_graph_placement(g)
+        self.rebalance()
+        return [self.gather_scheduling_result(g) for g in graph_list]
 
     def initial_graph_placement(self, g: ExecutionGraph) -> None:
         host_set: typing.Set[Host] = set()
@@ -336,27 +313,48 @@ class TopologicalResourceProvisioner:
             host = self.domain.find_host(s.domain_constraint["host"])
             assert host is not None
             host_set.add(host)
-        assert len(host_set) == 1
-        host = list(host_set)[0]
-        node = self.tree.get_node(host.name)
-        node.add_unscheduled_graph(g)
+        assert len(host_set) <= 1
+        if len(host_set) == 0:
+            node = random.choice(list(self.tree.name_lookup_map.values()))
+        else:
+            host = list(host_set)[0]
+            node = self.tree.get_node(host.name)
+        node.add_unscheduled_graph(g.copy(g.uuid))
 
     def rebalance(self) -> None:
         while self.tree.step():
             pass
 
-    def build_provisioner_tree(self) -> ProvisionerTree:
-        router_node = ProvisionerNode(
+    def gather_scheduling_result(self, graph: ExecutionGraph) -> SchedulingResult:
+        def gather_callback(vid: str, holder: typing.List):
+            def _f(node: ProvisionNode):
+                for v in node.scheduled_vertices:
+                    if v.uuid == vid:
+                        holder[0] = node.node.uuid
+                        # node.logger.info("gather %s hit %s", v.uuid, node.name)
+
+            return _f
+
+        result = SchedulingResult()
+        for v in graph.get_vertices():
+            holder = [None]
+            self.tree.traversal(gather_callback(v.uuid, holder))
+            assert holder[0] is not None
+            result.assign(holder[0], v.uuid)
+        return result
+
+    def build_provisioner_tree(self) -> ProvisionTree:
+        router_node = ProvisionNode(
             self.domain.router.name, "router", self.domain.router.node, None
         )
-        tree = ProvisionerTree(router_node)
+        tree = ProvisionTree(router_node)
         for hrg in self.domain.hrgs:
-            switch_node = ProvisionerNode(
+            switch_node = ProvisionNode(
                 hrg.switch.name, "switch", hrg.switch.node, router_node
             )
             tree.add_node(switch_node)
             for host in hrg.hosts:
-                host_node = ProvisionerNode(host.name, "host", host.node, switch_node)
+                host_node = ProvisionNode(host.name, "host", host.node, switch_node)
                 tree.add_node(host_node)
                 switch_node.add_child(host_node)
             router_node.add_child(switch_node)
