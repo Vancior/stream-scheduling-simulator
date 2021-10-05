@@ -38,13 +38,19 @@ class LatencyCalculator:
         # for v in graph.get_vertices():
         #     self.topo.occupy_node(result.get_scheduled_node(v.uuid))
 
-    def compute_latency(self) -> typing.Dict[str, int]:
-        result = dict()
+    def compute_latency(
+        self,
+    ) -> typing.Tuple[typing.Dict[str, int], typing.Dict[str, int]]:
+        latency = dict()
+        bp_rate = dict()
         for g in self.graph_list:
-            result[g.graph.uuid] = self.topological_graph_latency(g)
-        return result
+            lat, bp = self.topological_graph_latency(g)
+            latency[g.graph.uuid] = lat
+            bp_rate[g.graph.uuid] = bp / len(g.graph.get_edges())
+        return latency, bp_rate
 
-    def topological_graph_latency(self, g: ScheduledGraph) -> int:
+    def topological_graph_latency(self, g: ScheduledGraph) -> typing.Tuple[int, int]:
+        back_pressure_counter = 0
         latency_dict = {}
         last_vid = None
         for v in g.graph.topological_order():
@@ -67,6 +73,18 @@ class LatencyCalculator:
                 )
                 for u in up_vertices
             ]
+            # NOTE check if back-pressure exist
+            for u, lat in zip(up_vertices, trans_lat):
+                if (1000 / g.graph.get_edge(u.uuid, v.uuid)["per_second"]) < lat:
+                    self.logger.info(
+                        "bp from %s to %s: expected %f, got %f",
+                        u.uuid,
+                        v.uuid,
+                        1000 / g.graph.get_edge(u.uuid, v.uuid)["per_second"],
+                        lat,
+                    )
+                    back_pressure_counter += 1
+
             # TODO: configurable latency aggregation
             up_latency = avg(*[sum(i) for i in zip(node_lat, intri_lat, trans_lat)])
             latency_dict[v.uuid] = up_latency + self.topo.get_computation_latency(
@@ -91,4 +109,4 @@ class LatencyCalculator:
 
         if last_vid is None:
             return 0
-        return latency_dict[last_vid]
+        return latency_dict[last_vid], back_pressure_counter

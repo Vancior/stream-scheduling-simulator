@@ -1,6 +1,7 @@
 import typing
 from typing import NamedTuple
 from utils import DisjointSet
+import yaml
 
 import networkx as nx
 from networkx.algorithms.dag import topological_sort
@@ -148,8 +149,34 @@ class ExecutionGraph:
     def copy(self, uuid: str):
         return self.sub_graph(set([v.uuid for v in self.get_vertices()]), uuid)
 
+    def to_dict(self):
+        vertices = dict()
+        for vid, data in self.g.nodes(data=True):
+            vertices[vid] = data
+        edges = list()
+        for from_id, to_id, data in self.g.edges(data=True):
+            edges.append({"from": from_id, "to": to_id, "data": data})
+        return {"uuid": self.uuid, "vertices": vertices, "edges": edges}
+
+    @classmethod
+    def from_dict(cls, data):
+        g = cls(data["uuid"])
+        for vid, vdata in data["vertices"]:
+            g.g.add_node(vid, **vdata)
+        for edge in data["edges"]:
+            g.g.add_edge(edge["from"], edge["to"], **edge["data"])
+        return g
+
+    @classmethod
+    def save_all(cls, graph_list, f: typing.IO[str]):
+        yaml.dump_all([g.to_dict() for g in graph_list], f)
+
+    @classmethod
+    def load_all(cls, f: typing.IO[str]) -> typing.List:
+        return [cls.from_dict(i) for i in yaml.load_all(f)]
+
     @classmethod
     def merge(cls, graph_list, uuid: str):
-        g = ExecutionGraph(uuid)
+        g = cls(uuid)
         g.g = nx.compose_all([i.g for i in graph_list])
         return g

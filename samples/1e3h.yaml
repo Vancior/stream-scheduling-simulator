@@ -23,11 +23,11 @@ domains:
     delay: 5
   hrgs:
   - name: rasp
-    replica: 1
+    replica: 3
     spec:
       mips: 5000
       cores: 4
-      memory: 4
+      memory: 2
       labels:
         machine: rasp
         connector: robot
@@ -35,5 +35,5 @@ domains:
       bd: 1000
       delay: 5
 interdomain:
-  bd: 10
+  bd: 5
   delay: 50

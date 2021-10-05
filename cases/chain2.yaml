@@ -1,0 +1,893 @@
+edges:
+- data:
+    per_second: 987
+    unit_size: 20473
+  from: ce786b34-v1
+  to: ce786b34-v2
+- data:
+    per_second: 737
+    unit_size: 399
+  from: ce786b34-v2
+  to: ce786b34-v3
+- data:
+    per_second: 198
+    unit_size: 643
+  from: ce786b34-v3
+  to: ce786b34-v4
+- data:
+    per_second: 258
+    unit_size: 5112
+  from: ce786b34-v4
+  to: ce786b34-v5
+- data:
+    per_second: 282
+    unit_size: 4443
+  from: ce786b34-v5
+  to: ce786b34-v6
+- data:
+    per_second: 505
+    unit_size: 49013
+  from: ce786b34-v6
+  to: ce786b34-v7
+- data:
+    per_second: 5113
+    unit_size: 107
+  from: ce786b34-v7
+  to: ce786b34-v8
+- data:
+    per_second: 366
+    unit_size: 88627
+  from: ce786b34-v8
+  to: ce786b34-v9
+- data:
+    per_second: 471
+    unit_size: 213
+  from: ce786b34-v9
+  to: ce786b34-v10
+uuid: ce786b34
+vertices:
+  ce786b34-v1:
+    domain_constraint:
+      host: rasp2
+    downstream_bd: 20206851
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  ce786b34-v10:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 100323
+  ce786b34-v2:
+    domain_constraint: {}
+    downstream_bd: 294063
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 20206851
+  ce786b34-v3:
+    domain_constraint: {}
+    downstream_bd: 127314
+    memory: 200000000
+    mi: 8
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 294063
+  ce786b34-v4:
+    domain_constraint: {}
+    downstream_bd: 1318896
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 127314
+  ce786b34-v5:
+    domain_constraint: {}
+    downstream_bd: 1252926
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 1318896
+  ce786b34-v6:
+    domain_constraint: {}
+    downstream_bd: 24751565
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 1252926
+  ce786b34-v7:
+    domain_constraint: {}
+    downstream_bd: 547091
+    memory: 200000000
+    mi: 9
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 24751565
+  ce786b34-v8:
+    domain_constraint: {}
+    downstream_bd: 32437482
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 547091
+  ce786b34-v9:
+    domain_constraint: {}
+    downstream_bd: 100323
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 32437482
+---
+edges:
+- data:
+    per_second: 262
+    unit_size: 9128
+  from: 89fb33b2-v1
+  to: 89fb33b2-v2
+- data:
+    per_second: 4481
+    unit_size: 114
+  from: 89fb33b2-v2
+  to: 89fb33b2-v3
+- data:
+    per_second: 263
+    unit_size: 122
+  from: 89fb33b2-v3
+  to: 89fb33b2-v4
+- data:
+    per_second: 152
+    unit_size: 63846
+  from: 89fb33b2-v4
+  to: 89fb33b2-v5
+- data:
+    per_second: 708
+    unit_size: 37308
+  from: 89fb33b2-v5
+  to: 89fb33b2-v6
+uuid: 89fb33b2
+vertices:
+  89fb33b2-v1:
+    domain_constraint:
+      host: rasp2
+    downstream_bd: 2391536
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  89fb33b2-v2:
+    domain_constraint: {}
+    downstream_bd: 510834
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 2391536
+  89fb33b2-v3:
+    domain_constraint: {}
+    downstream_bd: 32086
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 510834
+  89fb33b2-v4:
+    domain_constraint: {}
+    downstream_bd: 9704592
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 32086
+  89fb33b2-v5:
+    domain_constraint: {}
+    downstream_bd: 26414064
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 9704592
+  89fb33b2-v6:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 26414064
+---
+edges:
+- data:
+    per_second: 9915
+    unit_size: 41619
+  from: 978896d6-v1
+  to: 978896d6-v2
+- data:
+    per_second: 285
+    unit_size: 443
+  from: 978896d6-v2
+  to: 978896d6-v3
+uuid: 978896d6
+vertices:
+  978896d6-v1:
+    domain_constraint:
+      host: rasp1
+    downstream_bd: 412652385
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  978896d6-v2:
+    domain_constraint: {}
+    downstream_bd: 126255
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 412652385
+  978896d6-v3:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 126255
+---
+edges:
+- data:
+    per_second: 116
+    unit_size: 3840
+  from: f3f74619-v1
+  to: f3f74619-v2
+- data:
+    per_second: 1979
+    unit_size: 9586
+  from: f3f74619-v2
+  to: f3f74619-v3
+- data:
+    per_second: 522
+    unit_size: 896
+  from: f3f74619-v3
+  to: f3f74619-v4
+- data:
+    per_second: 2198
+    unit_size: 4102
+  from: f3f74619-v4
+  to: f3f74619-v5
+- data:
+    per_second: 402
+    unit_size: 71000
+  from: f3f74619-v5
+  to: f3f74619-v6
+uuid: f3f74619
+vertices:
+  f3f74619-v1:
+    domain_constraint:
+      host: rasp3
+    downstream_bd: 445440
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  f3f74619-v2:
+    domain_constraint: {}
+    downstream_bd: 18970694
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 445440
+  f3f74619-v3:
+    domain_constraint: {}
+    downstream_bd: 467712
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 18970694
+  f3f74619-v4:
+    domain_constraint: {}
+    downstream_bd: 9016196
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 467712
+  f3f74619-v5:
+    domain_constraint: {}
+    downstream_bd: 28542000
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 9016196
+  f3f74619-v6:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 28542000
+---
+edges:
+- data:
+    per_second: 540
+    unit_size: 27028
+  from: 01aac420-v1
+  to: 01aac420-v2
+- data:
+    per_second: 766
+    unit_size: 4000
+  from: 01aac420-v2
+  to: 01aac420-v3
+- data:
+    per_second: 706
+    unit_size: 68526
+  from: 01aac420-v3
+  to: 01aac420-v4
+- data:
+    per_second: 3190
+    unit_size: 3512
+  from: 01aac420-v4
+  to: 01aac420-v5
+- data:
+    per_second: 3790
+    unit_size: 170
+  from: 01aac420-v5
+  to: 01aac420-v6
+- data:
+    per_second: 6615
+    unit_size: 6705
+  from: 01aac420-v6
+  to: 01aac420-v7
+- data:
+    per_second: 8581
+    unit_size: 1217
+  from: 01aac420-v7
+  to: 01aac420-v8
+- data:
+    per_second: 319
+    unit_size: 151
+  from: 01aac420-v8
+  to: 01aac420-v9
+- data:
+    per_second: 149
+    unit_size: 45348
+  from: 01aac420-v9
+  to: 01aac420-v10
+- data:
+    per_second: 6271
+    unit_size: 8592
+  from: 01aac420-v10
+  to: 01aac420-v11
+uuid: 01aac420
+vertices:
+  01aac420-v1:
+    domain_constraint:
+      host: rasp1
+    downstream_bd: 14595120
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  01aac420-v10:
+    domain_constraint: {}
+    downstream_bd: 53880432
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 6756852
+  01aac420-v11:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 53880432
+  01aac420-v2:
+    domain_constraint: {}
+    downstream_bd: 3064000
+    memory: 200000000
+    mi: 7
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 14595120
+  01aac420-v3:
+    domain_constraint: {}
+    downstream_bd: 48379356
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 3064000
+  01aac420-v4:
+    domain_constraint: {}
+    downstream_bd: 11203280
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 48379356
+  01aac420-v5:
+    domain_constraint: {}
+    downstream_bd: 644300
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 11203280
+  01aac420-v6:
+    domain_constraint: {}
+    downstream_bd: 44353575
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 644300
+  01aac420-v7:
+    domain_constraint: {}
+    downstream_bd: 10443077
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 44353575
+  01aac420-v8:
+    domain_constraint: {}
+    downstream_bd: 48169
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 10443077
+  01aac420-v9:
+    domain_constraint: {}
+    downstream_bd: 6756852
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 48169
+---
+edges:
+- data:
+    per_second: 7263
+    unit_size: 74965
+  from: 206a13aa-v1
+  to: 206a13aa-v2
+- data:
+    per_second: 9225
+    unit_size: 44338
+  from: 206a13aa-v2
+  to: 206a13aa-v3
+- data:
+    per_second: 272
+    unit_size: 210
+  from: 206a13aa-v3
+  to: 206a13aa-v4
+- data:
+    per_second: 1643
+    unit_size: 799
+  from: 206a13aa-v4
+  to: 206a13aa-v5
+- data:
+    per_second: 5176
+    unit_size: 79475
+  from: 206a13aa-v5
+  to: 206a13aa-v6
+- data:
+    per_second: 1995
+    unit_size: 5947
+  from: 206a13aa-v6
+  to: 206a13aa-v7
+- data:
+    per_second: 328
+    unit_size: 12468
+  from: 206a13aa-v7
+  to: 206a13aa-v8
+uuid: 206a13aa
+vertices:
+  206a13aa-v1:
+    domain_constraint:
+      host: rasp1
+    downstream_bd: 544470795
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  206a13aa-v2:
+    domain_constraint: {}
+    downstream_bd: 409018050
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 544470795
+  206a13aa-v3:
+    domain_constraint: {}
+    downstream_bd: 57120
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 409018050
+  206a13aa-v4:
+    domain_constraint: {}
+    downstream_bd: 1312757
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 57120
+  206a13aa-v5:
+    domain_constraint: {}
+    downstream_bd: 411362600
+    memory: 200000000
+    mi: 8
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 1312757
+  206a13aa-v6:
+    domain_constraint: {}
+    downstream_bd: 11864265
+    memory: 200000000
+    mi: 7
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 411362600
+  206a13aa-v7:
+    domain_constraint: {}
+    downstream_bd: 4089504
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 11864265
+  206a13aa-v8:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 4089504
+---
+edges:
+- data:
+    per_second: 768
+    unit_size: 4662
+  from: 7927e930-v1
+  to: 7927e930-v2
+- data:
+    per_second: 4683
+    unit_size: 433
+  from: 7927e930-v2
+  to: 7927e930-v3
+- data:
+    per_second: 755
+    unit_size: 630
+  from: 7927e930-v3
+  to: 7927e930-v4
+- data:
+    per_second: 3226
+    unit_size: 13901
+  from: 7927e930-v4
+  to: 7927e930-v5
+uuid: 7927e930
+vertices:
+  7927e930-v1:
+    domain_constraint:
+      host: rasp1
+    downstream_bd: 3580416
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  7927e930-v2:
+    domain_constraint: {}
+    downstream_bd: 2027739
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 3580416
+  7927e930-v3:
+    domain_constraint: {}
+    downstream_bd: 475650
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 2027739
+  7927e930-v4:
+    domain_constraint: {}
+    downstream_bd: 44844626
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 475650
+  7927e930-v5:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 4
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 44844626
+---
+edges:
+- data:
+    per_second: 3873
+    unit_size: 21614
+  from: 18d30515-v1
+  to: 18d30515-v2
+- data:
+    per_second: 3835
+    unit_size: 7672
+  from: 18d30515-v2
+  to: 18d30515-v3
+- data:
+    per_second: 3082
+    unit_size: 613
+  from: 18d30515-v3
+  to: 18d30515-v4
+- data:
+    per_second: 841
+    unit_size: 8642
+  from: 18d30515-v4
+  to: 18d30515-v5
+- data:
+    per_second: 458
+    unit_size: 80628
+  from: 18d30515-v5
+  to: 18d30515-v6
+uuid: 18d30515
+vertices:
+  18d30515-v1:
+    domain_constraint:
+      host: rasp1
+    downstream_bd: 83711022
+    memory: 200000000
+    mi: 9
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  18d30515-v2:
+    domain_constraint: {}
+    downstream_bd: 29422120
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 83711022
+  18d30515-v3:
+    domain_constraint: {}
+    downstream_bd: 1889266
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 29422120
+  18d30515-v4:
+    domain_constraint: {}
+    downstream_bd: 7267922
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 1889266
+  18d30515-v5:
+    domain_constraint: {}
+    downstream_bd: 36927624
+    memory: 200000000
+    mi: 5
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 7267922
+  18d30515-v6:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 9
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 36927624
+---
+edges:
+- data:
+    per_second: 693
+    unit_size: 854
+  from: b7520a72-v1
+  to: b7520a72-v2
+- data:
+    per_second: 134
+    unit_size: 95351
+  from: b7520a72-v2
+  to: b7520a72-v3
+- data:
+    per_second: 1851
+    unit_size: 2694
+  from: b7520a72-v3
+  to: b7520a72-v4
+- data:
+    per_second: 1357
+    unit_size: 143
+  from: b7520a72-v4
+  to: b7520a72-v5
+uuid: b7520a72
+vertices:
+  b7520a72-v1:
+    domain_constraint:
+      host: rasp2
+    downstream_bd: 591822
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  b7520a72-v2:
+    domain_constraint: {}
+    downstream_bd: 12777034
+    memory: 200000000
+    mi: 6
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 591822
+  b7520a72-v3:
+    domain_constraint: {}
+    downstream_bd: 4986594
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 12777034
+  b7520a72-v4:
+    domain_constraint: {}
+    downstream_bd: 194051
+    memory: 200000000
+    mi: 6
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 4986594
+  b7520a72-v5:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 9
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 194051
+---
+edges:
+- data:
+    per_second: 191
+    unit_size: 400
+  from: 783edd25-v1
+  to: 783edd25-v2
+- data:
+    per_second: 128
+    unit_size: 17677
+  from: 783edd25-v2
+  to: 783edd25-v3
+- data:
+    per_second: 252
+    unit_size: 361
+  from: 783edd25-v3
+  to: 783edd25-v4
+- data:
+    per_second: 6279
+    unit_size: 481
+  from: 783edd25-v4
+  to: 783edd25-v5
+- data:
+    per_second: 129
+    unit_size: 1091
+  from: 783edd25-v5
+  to: 783edd25-v6
+- data:
+    per_second: 849
+    unit_size: 8036
+  from: 783edd25-v6
+  to: 783edd25-v7
+- data:
+    per_second: 3051
+    unit_size: 2525
+  from: 783edd25-v7
+  to: 783edd25-v8
+uuid: 783edd25
+vertices:
+  783edd25-v1:
+    domain_constraint:
+      host: rasp2
+    downstream_bd: 76400
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+    upstream_bd: 0
+  783edd25-v2:
+    domain_constraint: {}
+    downstream_bd: 2262656
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 76400
+  783edd25-v3:
+    domain_constraint: {}
+    downstream_bd: 90972
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 2262656
+  783edd25-v4:
+    domain_constraint: {}
+    downstream_bd: 3020199
+    memory: 200000000
+    mi: 3
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 90972
+  783edd25-v5:
+    domain_constraint: {}
+    downstream_bd: 140739
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 3020199
+  783edd25-v6:
+    domain_constraint: {}
+    downstream_bd: 6822564
+    memory: 200000000
+    mi: 6
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 140739
+  783edd25-v7:
+    domain_constraint: {}
+    downstream_bd: 7703775
+    memory: 200000000
+    mi: 2
+    out_unit_size: 0
+    type: operator
+    upstream_bd: 6822564
+  783edd25-v8:
+    domain_constraint:
+      host: cloud1
+    downstream_bd: 0
+    memory: 200000000
+    mi: 9
+    out_unit_size: 0
+    type: sink
+    upstream_bd: 7703775

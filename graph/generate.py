@@ -89,8 +89,8 @@ class GraphGenerator:
             g.add_vertex(v)
             if last_vertex == v_source:
                 size = self.gen_args["unit_size_cb"]()
-                rate = self.gen_args["unit_rate_cb"]() * 100
-                print("graph {} source bd {}".format(g.uuid, size * rate / 1e6))
+                rate = self.gen_args["unit_rate_cb"]()
+                print("graph {} source bd {} mbps".format(g.uuid, size * rate / 1e6))
                 g.connect(
                     last_vertex,
                     v,
