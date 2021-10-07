@@ -1,3 +1,4 @@
+from collections import defaultdict
 import random
 import math
 import typing
@@ -117,6 +118,93 @@ class GraphGenerator:
             self.gen_args["unit_rate_cb"](),
         )
         return g
+
+    def gen_dag_graph(self) -> ExecutionGraph:
+        total_rank = self.gen_args["total_rank"]
+        max_node_per_rank = self.gen_args["max_node_per_rank"]
+        max_predecessors = self.gen_args["max_predecessors"]
+
+        g = ExecutionGraph(self.name)
+
+        node_rank_map: typing.Dict[int, int] = dict()
+        ranked_nodes = [[0]]
+        node_seq_num = 1
+        node_rank_map[0] = 0
+        edges = []
+        for rank in range(1, total_rank):
+            cur_node_cnt = random.randint(1, max_node_per_rank)
+            cur_nodes = [node_seq_num + i for i in range(cur_node_cnt)]
+            node_seq_num += cur_node_cnt
+            for node in cur_nodes:
+                node_rank_map[node] = rank
+                pre_cnt = random.randint(1, max_predecessors)
+                for pre_node in self.dag_select_predecessors(ranked_nodes, pre_cnt):
+                    edges.append((pre_node, node))
+                    # print("{} ---> {}".format(pre_node, node))
+            ranked_nodes.append(cur_nodes)
+
+        node_cnt = node_seq_num
+        node_out_degree: typing.Dict[int, int] = defaultdict(int)
+        for e in edges:
+            node_out_degree[e[0]] += 1
+
+        node_vertex_map: typing.Dict[int, Vertex] = dict()
+        node_vertex_map[0] = Vertex.from_spec(
+            "{}-v{}".format(self.name, 0),
+            "source",
+            {"host": random.choice(self.gen_args["source_hosts"])},
+            0,
+            0,
+            self.gen_args["mi_cb"](),
+            self.gen_args["memory_cb"](),
+        )
+        for node in range(1, node_cnt):
+            if node_out_degree[node] == 0:
+                node_type = "sink"
+                labels = {"host": random.choice(self.gen_args["sink_hosts"])}
+            else:
+                node_type = "operator"
+                labels = {}
+            node_vertex_map[node] = Vertex.from_spec(
+                "{}-v{}".format(self.name, node),
+                node_type,
+                labels,
+                0,
+                0,
+                self.gen_args["mi_cb"](),
+                self.gen_args["memory_cb"](),
+            )
+        for v in node_vertex_map.values():
+            g.add_vertex(v)
+
+        for e in edges:
+            g.connect(
+                node_vertex_map[e[0]],
+                node_vertex_map[e[1]],
+                self.gen_args["unit_size_cb"](node_rank_map[e[1]]),
+                self.gen_args["unit_rate_cb"](),
+            )
+
+        return g
+
+    @classmethod
+    def dag_select_predecessors(
+        cls, nodes: typing.List[typing.List[int]], cnt: int
+    ) -> typing.List[int]:
+        selected = []
+        quota = cnt
+        lv = len(nodes) - 1
+        while lv >= 0:
+            sample_cnt = min(random.randint(0, quota), len(nodes[lv]))
+            quota -= sample_cnt
+            for sample in random.sample(nodes[lv], sample_cnt):
+                selected.append(sample)
+            if quota == 0:
+                break
+            lv -= 1
+        if len(selected) == 0:
+            selected.append(random.choice(nodes[0]))
+        return selected
 
 
 class ParameterGenerator:

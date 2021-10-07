@@ -1,9 +1,10 @@
 import typing
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from typing import NamedTuple
-from utils import gen_uuid
 
+import IPython
 from graph import ExecutionGraph
+from utils import gen_uuid
 
 MAX_EDGE_CAPACITY = int(1e20)
 
@@ -37,18 +38,25 @@ class FlowGraph:
         self.nodes = nodes
         self.edges = edges
 
-    def shortest_path(self, s: str, t: str) -> typing.List[FlowGraphEdge]:
+    def shortest_path(self, s: str, t: str) -> typing.List[int]:
         QueueItem = namedtuple("QueueItem", ["node", "edges"])
         queue: typing.List[QueueItem] = []
         queue.append(QueueItem(s, []))
+        visited: typing.Dict[str, bool] = defaultdict(bool)
+        visited[s] = True
         while len(queue) > 0:
             current = queue.pop(0)
             if current.node == t:
                 return current.edges
-            for i in self.nodes[current.node].out_edges:
-                e = self.edges[i]
-                if not e.disabled and e.flow < e.cap:
-                    queue.append(QueueItem(e.to_node, current.edges + [e]))
+            for e_idx in self.nodes[current.node].out_edges:
+                edge = self.edges[e_idx]
+                if (
+                    (not edge.disabled)
+                    and edge.flow < edge.cap
+                    and (not visited[e_idx])
+                ):
+                    visited[e_idx] = True
+                    queue.append(QueueItem(edge.to_node, current.edges + [e_idx]))
         return []
 
     def reachable(self, s: str) -> typing.Set[str]:
@@ -61,7 +69,7 @@ class FlowGraph:
             for to_node in [
                 self.edges[i].to_node
                 for i in self.nodes[current].out_edges
-                if not self.edges[i].disabled
+                if not self.edges[i].disabled and self.edges[i].cap > 0
             ]:
                 if to_node not in reachable_set:
                     queue.append(to_node)
@@ -106,14 +114,17 @@ def min_cut(g: ExecutionGraph):
 
     flow_graph = FlowGraph(nodes, edges)
     while True:
-        path = flow_graph.shortest_path(fake_source, fake_sink)
-        if len(path) == 0:
+        edge_idxes = flow_graph.shortest_path(fake_source, fake_sink)
+        if len(edge_idxes) == 0:
             break
-        min_incr = min([p.cap - p.flow for p in path])
-        for p in path:
-            p.flow += min_incr
-            if p.cap - p.flow == 0:
-                p.disabled = True
+        min_incr = min([edges[idx].cap - edges[idx].flow for idx in edge_idxes])
+        for edge_idx in edge_idxes:
+            edge = edges[edge_idx]
+            oppo_edge = edges[edge_idx ^ 1]
+            edge.flow += min_incr
+            oppo_edge.flow -= min_incr
+            if edge.cap - edge.flow == 0:
+                edge.disabled = True
 
     s_cut = flow_graph.reachable(fake_source)
     t_cut = set(flow_graph.nodes.keys()) - s_cut

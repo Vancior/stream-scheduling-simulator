@@ -43,14 +43,20 @@ class LatencyCalculator:
     ) -> typing.Tuple[typing.Dict[str, int], typing.Dict[str, int]]:
         latency = dict()
         bp_rate = dict()
+        cross_bd = 0
         for g in self.graph_list:
-            lat, bp = self.topological_graph_latency(g)
+            lat, bp, bd = self.topological_graph_latency(g)
             latency[g.graph.uuid] = lat
             bp_rate[g.graph.uuid] = bp / len(g.graph.get_edges())
+            cross_bd += bd
+        print("cloud-edge bd:", cross_bd)
         return latency, bp_rate
 
-    def topological_graph_latency(self, g: ScheduledGraph) -> typing.Tuple[int, int]:
-        back_pressure_counter = 0
+    def topological_graph_latency(
+        self, g: ScheduledGraph
+    ) -> typing.Tuple[int, int, int]:
+        cross_bd = 0
+        back_pressure_acc = 0
         latency_dict = {}
         last_vid = None
         for v in g.graph.topological_order():
@@ -73,20 +79,47 @@ class LatencyCalculator:
                 )
                 for u in up_vertices
             ]
+
+            # NOTE cross cloud-edge bandwidth usage
+            for u in up_vertices:
+                node_u = g.result.get_scheduled_node(u.uuid)
+                node_v = g.result.get_scheduled_node(v.uuid)
+                if node_u.startswith("rasp") and node_v.startswith("cloud"):
+                    cross_bd += (
+                        g.graph.get_edge(u.uuid, v.uuid)["unit_size"]
+                        * g.graph.get_edge(u.uuid, v.uuid)["per_second"]
+                    )
             # NOTE check if back-pressure exist
             for u, lat in zip(up_vertices, trans_lat):
-                if (1000 / g.graph.get_edge(u.uuid, v.uuid)["per_second"]) < lat:
+                if lat == 0:
+                    continue
+                real_freq = 1000 / lat
+                expected_freq = g.graph.get_edge(u.uuid, v.uuid)["per_second"]
+                if real_freq < expected_freq:
                     self.logger.info(
-                        "bp from %s to %s: expected %f, got %f",
+                        "bp from %s to %s: expected %.2fHz, got %.2fHz",
                         u.uuid,
                         v.uuid,
-                        1000 / g.graph.get_edge(u.uuid, v.uuid)["per_second"],
-                        lat,
+                        expected_freq,
+                        real_freq,
                     )
-                    back_pressure_counter += 1
+                    back_pressure_acc += (expected_freq - real_freq) / expected_freq
 
             # TODO: configurable latency aggregation
-            up_latency = avg(*[sum(i) for i in zip(node_lat, intri_lat, trans_lat)])
+            weighted_sum = 0
+            total_weight = 0
+            for u, lat1, lat2, lat3 in zip(up_vertices, node_lat, intri_lat, trans_lat):
+                weight = (
+                    g.graph.get_edge(u.uuid, v.uuid)["unit_size"]
+                    * g.graph.get_edge(u.uuid, v.uuid)["per_second"]
+                )
+                total_weight += weight
+                weighted_sum += weight * (lat1 + lat2 + lat3)
+            # up_latency = avg(*[sum(i) for i in zip(node_lat, intri_lat, trans_lat)])
+            if len(up_vertices) == 0:
+                up_latency = 0
+            else:
+                up_latency = weighted_sum / total_weight
             latency_dict[v.uuid] = up_latency + self.topo.get_computation_latency(
                 g.result.get_scheduled_node(v.uuid), g.graph.get_vertex(v.uuid).mi
             )
@@ -108,5 +141,5 @@ class LatencyCalculator:
             last_vid = v.uuid
 
         if last_vid is None:
-            return 0
-        return latency_dict[last_vid], back_pressure_counter
+            return 0, 0, 0
+        return latency_dict[last_vid], back_pressure_acc, cross_bd

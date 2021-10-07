@@ -122,8 +122,11 @@ class FlowScheduler(Scheduler):
 
             # NOTE generate cut options, if no option provided, skip this edge domain
             graph_cut_options: typing.List[typing.List[CutOption]] = [
-                sorted(gen_cut_options(sg.g), key=lambda o: o.flow) for sg in sg_list
+                sorted(gen_cut_options(sg.g), key=lambda o: o.flow, reverse=True)
+                for sg in sg_list
             ]
+            # for option in graph_cut_options[0]:
+            #     print(option.s_cut, option.t_cut, option.flow)
             if len([None for options in graph_cut_options if len(options) == 0]) > 0:
                 self.logger.error("no option provided")
                 continue

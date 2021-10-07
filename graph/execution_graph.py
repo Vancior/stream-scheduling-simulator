@@ -1,10 +1,9 @@
 import typing
-from typing import NamedTuple
-from utils import DisjointSet
-import yaml
 
 import networkx as nx
+import yaml
 from networkx.algorithms.dag import topological_sort
+from utils import DisjointSet
 
 from .vertex import Vertex
 
@@ -161,7 +160,7 @@ class ExecutionGraph:
     @classmethod
     def from_dict(cls, data):
         g = cls(data["uuid"])
-        for vid, vdata in data["vertices"]:
+        for vid, vdata in data["vertices"].items():
             g.g.add_node(vid, **vdata)
         for edge in data["edges"]:
             g.g.add_edge(edge["from"], edge["to"], **edge["data"])
@@ -173,7 +172,7 @@ class ExecutionGraph:
 
     @classmethod
     def load_all(cls, f: typing.IO[str]) -> typing.List:
-        return [cls.from_dict(i) for i in yaml.load_all(f)]
+        return [cls.from_dict(i) for i in yaml.load_all(f, Loader=yaml.Loader)]
 
     @classmethod
     def merge(cls, graph_list, uuid: str):

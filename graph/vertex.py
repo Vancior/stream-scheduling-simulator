@@ -1,4 +1,6 @@
 class Vertex:
+    uuid: str
+
     def __init__(self, uuid, data) -> None:
         self.uuid = uuid
         self.data = data

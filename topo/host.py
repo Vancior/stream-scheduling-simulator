@@ -19,7 +19,15 @@ class Host:
         self.memory = memory
         self.labels = labels
         self.node = Node.from_spec(
-            str(uuid.uuid4())[:8], "host", mips, cores, memory, 0, 0, labels
+            name,
+            "host",
+            mips,
+            cores,
+            memory,
+            0,
+            0,
+            labels
+            # str(uuid.uuid4())[:8], "host", mips, cores, memory, 0, 0, labels
         )
 
     def replace_node(self, node: Node) -> None:

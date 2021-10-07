@@ -13,7 +13,7 @@ class SchedulingResultStatus(enum.Enum):
 
 class SchedulingResult:
     status: SchedulingResultStatus
-    assign_map: dict
+    assign_map: typing.Dict[str, str]
     reason: str
 
     def __init__(self, status=SchedulingResultStatus.SUCCEED, reason="") -> None:
@@ -36,7 +36,7 @@ class SchedulingResult:
     def assign(self, nid: str, vid: str):
         self.assign_map[vid] = nid
 
-    def get_scheduled_node(self, vid: str):
+    def get_scheduled_node(self, vid: str) -> str:
         return self.assign_map.get(vid)
 
     def get_assignments(self) -> typing.ItemsView:
