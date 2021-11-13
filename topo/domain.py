@@ -9,6 +9,8 @@ from topo.topology import Topology
 
 
 class Domain:
+    type: str
+    name: str
     topo: Topology
     host_lookup_table: typing.Dict[str, Host]
 

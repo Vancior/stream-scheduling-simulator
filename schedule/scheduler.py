@@ -12,6 +12,11 @@ from utils import gen_uuid, get_logger
 from .result import SchedulingResult, SchedulingResultStatus
 
 
+class SourcedGraph(typing.NamedTuple):
+    idx: int
+    g: ExecutionGraph
+
+
 class Scheduler(ABC):
     logger: logging.Logger
 
@@ -51,11 +56,11 @@ class Scheduler(ABC):
             host = domain.find_host(hostname)
             if host is None:
                 return False
-            self.logger.info(
-                "required: %d; remaining: %d",
-                count,
-                host.node.slots - host.node.occupied,
-            )
+            # self.logger.info(
+            #     "required: %d; remaining: %d",
+            #     count,
+            #     host.node.slots - host.node.occupied,
+            # )
             if not domain.topo.slot_filter(count, host.node.uuid):
                 return False
         return True
@@ -91,7 +96,7 @@ class RandomScheduler(Scheduler):
                     "no available host for {}".format(v.uuid)
                 )
             nid = random.choice(nid_list)
-            self.logger.debug("Select node %s for vertex %s", nid, v.uuid)
+            # self.logger.debug("Select node %s for vertex %s", nid, v.uuid)
             result.assign(nid, v.uuid)
             topo.occupy_node(nid, 1)
 

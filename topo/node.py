@@ -1,7 +1,7 @@
 import threading
 import typing
 
-SLOT_MEMORY_SIZE = int(2e8)
+SLOT_MEMORY_SIZE = int(5e8)
 
 
 class Node:

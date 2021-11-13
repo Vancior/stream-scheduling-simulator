@@ -76,7 +76,7 @@ class FlowGraph:
         return reachable_set
 
 
-def min_cut(g: ExecutionGraph):
+def min_cut(g: ExecutionGraph) -> typing.Tuple[typing.Set[str], typing.Set[str]]:
     nodes: typing.Dict[str, FlowGraphNode] = {
         v.uuid: FlowGraphNode([]) for v in g.get_vertices()
     }
@@ -131,9 +131,12 @@ def min_cut(g: ExecutionGraph):
     s_cut.remove(fake_source)
     t_cut.remove(fake_sink)
 
-    total_flow = 0
-    for e in edges:
-        if e.from_node in s_cut and e.to_node in t_cut:
-            total_flow += e.flow
+    return s_cut, t_cut
 
-    return s_cut, t_cut, total_flow
+
+def cross_bd(g: ExecutionGraph, s_cut: typing.Set[str], t_cut: typing.Set[str]) -> int:
+    total_bd = 0
+    for u, v, data in g.get_edges():
+        if u in s_cut and v in t_cut:
+            total_bd += data["unit_size"] * data["per_second"]
+    return total_bd

@@ -1,8 +1,8 @@
 import random
 import typing
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
-from algo import min_cut
+from algo import min_cut, cross_bd
 from graph import ExecutionGraph
 from topo import Domain, Scenario
 from utils import gen_uuid, grouped_exactly_one_binpack
@@ -10,9 +10,7 @@ from utils import gen_uuid, grouped_exactly_one_binpack
 from .flow_provisioner import TopologicalProvisioner
 from .provision import Provisioner
 from .result import SchedulingResult, SchedulingResultStatus
-from .scheduler import RandomScheduler, Scheduler
-
-SourcedGraph = namedtuple("SourcedGraph", ["idx", "g"])
+from .scheduler import RandomScheduler, Scheduler, SourcedGraph
 
 
 class FlowScheduler(Scheduler):
@@ -120,78 +118,83 @@ class FlowScheduler(Scheduler):
                     )
                 continue
 
-            # NOTE generate cut options, if no option provided, skip this edge domain
-            graph_cut_options: typing.List[typing.List[CutOption]] = [
-                sorted(gen_cut_options(sg.g), key=lambda o: o.flow, reverse=True)
-                for sg in sg_list
-            ]
-            # for option in graph_cut_options[0]:
-            #     print(option.s_cut, option.t_cut, option.flow)
-            if len([None for options in graph_cut_options if len(options) == 0]) > 0:
-                self.logger.error("no option provided")
+            try:
+                s_graph_list, t_graph_list = self.cloud_edge_cutting(
+                    sg_list, edge_domain
+                )
+            except RuntimeError as e:
+                self.logger.error(e)
                 continue
 
-            free_slots = sum(
-                [n.slots - n.occupied for n in edge_domain.topo.get_nodes()]
-            )
-            if (
-                sum(
-                    [
-                        len(options[0].s_cut)
-                        for options in graph_cut_options
-                        if len(options) > 0
-                    ]
-                )
-                <= free_slots
-            ):
-                # NOTE if slots are enough for min-cut
-                s_graph_list: typing.List[ExecutionGraph] = [
-                    sg.g.sub_graph(options[0].s_cut, gen_uuid())
-                    for sg, options in zip(sg_list, graph_cut_options)
-                ]
-                t_graph_list: typing.List[ExecutionGraph] = [
-                    sg.g.sub_graph(options[0].t_cut, gen_uuid())
-                    for sg, options in zip(sg_list, graph_cut_options)
-                ]
-                self.logger.info("graph_cutting: best")
-            else:
-                groups = [
-                    [(len(option.s_cut), option.flow) for option in options]
-                    for options in graph_cut_options
-                ]
-                solution = grouped_exactly_one_binpack(free_slots, groups)
-                s_graph_list: typing.List[ExecutionGraph] = [
-                    sg.g.sub_graph(options[s_idx].s_cut, gen_uuid())
-                    for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
-                ]
-                t_graph_list: typing.List[ExecutionGraph] = [
-                    sg.g.sub_graph(options[s_idx].t_cut, gen_uuid())
-                    for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
-                ]
-                self.logger.info("graph_cutting: binpack")
-
-            self.logger.info(
-                "s_graph_list: %s", [g.number_of_vertices() for g in s_graph_list]
-            )
-            self.logger.info(
-                "t_graph_list: %s", [g.number_of_vertices() for g in t_graph_list]
-            )
+            # self.logger.info(
+            #     "s_graph_list: %s", [g.number_of_vertices() for g in s_graph_list]
+            # )
+            # self.logger.info(
+            #     "t_graph_list: %s", [g.number_of_vertices() for g in t_graph_list]
+            # )
             s_result_list = self.get_provisioner(domain_name).schedule_multiple(
                 s_graph_list
             )
             # self.logger.info("s_result_list: %s", s_result_list)
-            t_result_list = [
-                self.get_provisioner(
-                    random.choice(self.scenario.get_cloud_domains()).name
-                ).schedule(g)
-                for g in t_graph_list
-            ]
+            t_result_list = self.get_provisioner(
+                random.choice(self.scenario.get_cloud_domains()).name
+            ).schedule_multiple(t_graph_list)
             # self.logger.info("t_result_list: %s", t_result_list)
 
             for sg, s_result, t_result in zip(sg_list, s_result_list, t_result_list):
                 results[sg.idx] = SchedulingResult.merge(s_result, t_result)
         # print(result_s)
         return results
+
+    @classmethod
+    def cloud_edge_cutting(
+        cls, sg_list: typing.List[SourcedGraph], edge_domain: Domain
+    ) -> typing.Tuple[typing.List[ExecutionGraph], typing.List[ExecutionGraph]]:
+        # NOTE generate cut options, if no option provided, skip this edge domain
+        graph_cut_options: typing.List[typing.List[CutOption]] = [
+            sorted(gen_cut_options(sg.g), key=lambda o: o.flow, reverse=False)
+            for sg in sg_list
+        ]
+        # for option in graph_cut_options[0]:
+        #     print(option.s_cut, option.t_cut, option.flow)
+        if len([None for options in graph_cut_options if len(options) == 0]) > 0:
+            raise RuntimeError("no option provided")
+
+        free_slots = sum([n.slots - n.occupied for n in edge_domain.topo.get_nodes()])
+        if (
+            sum(
+                [
+                    len(options[0].s_cut)
+                    for options in graph_cut_options
+                    if len(options) > 0
+                ]
+            )
+            <= free_slots
+        ):
+            # NOTE if slots are enough for min-cut
+            s_graph_list: typing.List[ExecutionGraph] = [
+                sg.g.sub_graph(options[0].s_cut, gen_uuid())
+                for sg, options in zip(sg_list, graph_cut_options)
+            ]
+            t_graph_list: typing.List[ExecutionGraph] = [
+                sg.g.sub_graph(options[0].t_cut, gen_uuid())
+                for sg, options in zip(sg_list, graph_cut_options)
+            ]
+        else:
+            groups = [
+                [(len(option.s_cut), option.flow) for option in options]
+                for options in graph_cut_options
+            ]
+            solution = grouped_exactly_one_binpack(free_slots, groups)
+            s_graph_list: typing.List[ExecutionGraph] = [
+                sg.g.sub_graph(options[s_idx].s_cut, gen_uuid())
+                for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
+            ]
+            t_graph_list: typing.List[ExecutionGraph] = [
+                sg.g.sub_graph(options[s_idx].t_cut, gen_uuid())
+                for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
+            ]
+        return s_graph_list, t_graph_list
 
 
 class CutOption(typing.NamedTuple):
@@ -202,14 +205,15 @@ class CutOption(typing.NamedTuple):
 
 def gen_cut_options(g: ExecutionGraph) -> typing.List[CutOption]:
     options: typing.List[CutOption] = []
-    s_cut, t_cut, flow = min_cut(g)
+    s_cut, t_cut = min_cut(g)
+    flow = cross_bd(g, s_cut, t_cut)
     options.append(CutOption(s_cut, t_cut, flow))
 
     while len(s_cut) > 1:
         sub_graph = g.sub_graph(s_cut, gen_uuid())
-        s_cut, _, flow = min_cut(sub_graph)
-        options.append(
-            CutOption(s_cut, set([v.uuid for v in g.get_vertices()]) - s_cut, flow)
-        )
+        s_cut, _ = min_cut(sub_graph)
+        t_cut = set([v.uuid for v in g.get_vertices()]) - s_cut
+        flow = cross_bd(g, s_cut, t_cut)
+        options.append(CutOption(s_cut, t_cut, flow))
 
     return options

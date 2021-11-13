@@ -21,6 +21,7 @@ def run():
     sc = topo.Scenario.from_dict(
         yaml.load(open("../../samples/1e3h.yaml", "r").read(), Loader=yaml.Loader)
     )
+    source_selector = graph.SourceSelector({"rasp1": 4, "rasp2": 4, "rasp3": 4})
     gen_args_list = [
         {
             "total_rank": random.randint(7, 7),
@@ -34,17 +35,17 @@ def run():
             "unit_size_cb": lambda r: random.randint(20000, 50000)
             / (math.pow(2, r - 1)),
             "unit_rate_cb": lambda: random.randint(10, 20),
-            "source_hosts": ["rasp1", "rasp2", "rasp3"],
+            "source_hosts": source_selector,
             "sink_hosts": ["cloud1"],
         }
-        for _ in range(12)
+        for _ in range(8)
     ]
     graph_list = [
         graph.GraphGenerator("g" + str(idx), **gen_args).gen_dag_graph()
         for idx, gen_args in enumerate(gen_args_list)
     ]
     # nx.draw(graph_list[0].g)
-    # f = open("../../notebook/dump.yaml")
+    # f = open("../../cases/a.yaml")
     # graph_list = graph.ExecutionGraph.load_all(f)
     # f.close()
 

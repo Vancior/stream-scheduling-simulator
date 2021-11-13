@@ -40,7 +40,7 @@ class LatencyCalculator:
 
     def compute_latency(
         self,
-    ) -> typing.Tuple[typing.Dict[str, int], typing.Dict[str, int]]:
+    ) -> typing.Tuple[typing.Dict[str, float], typing.Dict[str, float]]:
         latency = dict()
         bp_rate = dict()
         cross_bd = 0
@@ -49,7 +49,7 @@ class LatencyCalculator:
             latency[g.graph.uuid] = lat
             bp_rate[g.graph.uuid] = bp / len(g.graph.get_edges())
             cross_bd += bd
-        print("cloud-edge bd:", cross_bd)
+        # print("cloud-edge bd:", cross_bd)
         return latency, bp_rate
 
     def topological_graph_latency(
@@ -96,23 +96,20 @@ class LatencyCalculator:
                 real_freq = 1000 / lat
                 expected_freq = g.graph.get_edge(u.uuid, v.uuid)["per_second"]
                 if real_freq < expected_freq:
-                    self.logger.info(
-                        "bp from %s to %s: expected %.2fHz, got %.2fHz",
-                        u.uuid,
-                        v.uuid,
-                        expected_freq,
-                        real_freq,
-                    )
+                    #     self.logger.info(
+                    #         "bp from %s to %s: expected %.2fHz, got %.2fHz",
+                    #         u.uuid,
+                    #         v.uuid,
+                    #         expected_freq,
+                    #         real_freq,
+                    #     )
                     back_pressure_acc += (expected_freq - real_freq) / expected_freq
 
             # TODO: configurable latency aggregation
             weighted_sum = 0
             total_weight = 0
             for u, lat1, lat2, lat3 in zip(up_vertices, node_lat, intri_lat, trans_lat):
-                weight = (
-                    g.graph.get_edge(u.uuid, v.uuid)["unit_size"]
-                    * g.graph.get_edge(u.uuid, v.uuid)["per_second"]
-                )
+                weight = g.graph.get_edge(u.uuid, v.uuid)["per_second"]
                 total_weight += weight
                 weighted_sum += weight * (lat1 + lat2 + lat3)
             # up_latency = avg(*[sum(i) for i in zip(node_lat, intri_lat, trans_lat)])
@@ -140,6 +137,6 @@ class LatencyCalculator:
             # )
             last_vid = v.uuid
 
-        if last_vid is None:
-            return 0, 0, 0
-        return latency_dict[last_vid], back_pressure_acc, cross_bd
+        assert last_vid is not None
+        avg_e2e_lat = avg(*[latency_dict[v.uuid] for v in g.graph.get_sinks()])
+        return avg_e2e_lat, back_pressure_acc, cross_bd

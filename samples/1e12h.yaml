@@ -9,8 +9,8 @@ domains:
     replica: 1
     spec:
       mips: 5000
-      cores: 1000
-      memory: 2000
+      cores: 10000
+      memory: 20000
       labels:
         machine: rack
     switch:
@@ -20,12 +20,12 @@ domains:
   name: edge0
   router:
     bd: 200
-    delay: 2
+    delay: 1
   hrgs:
   - name: rasp
-    replica: 3
+    replica: 6
     spec:
-      mips: 3000
+      mips: 2000
       cores: 2
       memory: 4
       labels:
@@ -33,7 +33,19 @@ domains:
         connector: robot
     switch:
       bd: 100
-      delay: 1
+      delay: 2
+  - name: vm
+    replica: 6
+    spec:
+      mips: 4000
+      cores: 4
+      memory: 8
+      labels:
+        machine: rasp
+        connector: robot
+    switch:
+      bd: 100
+      delay: 2
 interdomain:
-  bd: 50
+  bd: 300
   delay: 20

@@ -1,3 +1,4 @@
+import time
 import heapq
 import logging
 import random
@@ -114,6 +115,11 @@ class ProvisionNode:
             parent_scatter.slot_diff = self.slot_diff
             self.slot_diff = 0
 
+        # print(
+        #     "node[{}]: local {}, occupy {}".format(
+        #         self.name, self.local_slots, self.node.occupied
+        #     )
+        # )
         return True, parent_scatter, children_scatters
 
     def schedule_graph_with_limit(self, n_slot: int):
@@ -129,6 +135,15 @@ class ProvisionNode:
                 n_slot -= 1
                 g.remove_vertex(s.uuid)
         self.rearrange_graphs()
+
+        vertices_num = sum([g.number_of_vertices() for g in self.unscheduled_graphs])
+        if vertices_num <= n_slot:
+            for g in self.unscheduled_graphs:
+                for v in g.get_vertices():
+                    self.scheduled_vertices.append(v)
+                    assert self.node.occupy(1)
+                    self.slot_diff -= 1
+            self.unscheduled_graphs = []
 
         topological_sorted_graphs = [
             g.topological_order_with_upstream_bd() for g in self.unscheduled_graphs
@@ -251,6 +266,8 @@ class ProvisionTree:
         self.name_lookup_map = {}
         self.root = root
         self.add_node(root)
+        self.step_count = 0
+        self.debug = False
 
     def add_node(self, node: ProvisionNode) -> None:
         self.name_lookup_map[node.name] = node
@@ -259,7 +276,16 @@ class ProvisionTree:
         return self.name_lookup_map.get(name)
 
     def step(self) -> bool:
+        if self.debug:
+            time.sleep(1)
+            print("=== new round {} ===".format(self.step_count))
+        self.step_count += 1
         node_step_map = {k: v.step() for k, v in self.name_lookup_map.items()}
+        if self.debug:
+            for k, v in node_step_map.items():
+                if v[0]:
+                    node = self.name_lookup_map[k]
+                    print(k, node.local_slots, node.node.occupied)
         updated = reduce(
             lambda i, j: i or j, [i[0] for i in node_step_map.values()], False
         )
@@ -269,6 +295,17 @@ class ProvisionTree:
             node = self.name_lookup_map[node_name]
             if not step_result[0]:
                 continue
+            if step_result[1].unscheduled_graphs is not None:
+                for g in step_result[1].unscheduled_graphs:
+                    for v in g.get_vertices():
+                        if v.uuid == "g407-v21":
+                            print("from {} to parent", node_name)
+            for scatter in step_result[2]:
+                if scatter.unscheduled_graphs is not None:
+                    for g in scatter.unscheduled_graphs:
+                        for v in g.get_vertices():
+                            if v.uuid == "g407-v21":
+                                print("from {} to child", node_name)
             if step_result[1] is not None and node.parent is not None:
                 node.parent.gather_from_child(node.name, step_result[1])
             if step_result[2] is not None:
@@ -301,6 +338,7 @@ class TopologicalProvisioner(Provisioner):
     def schedule_multiple(
         self, graph_list: typing.List[ExecutionGraph]
     ) -> typing.List[SchedulingResult]:
+        # print(self.domain.name, "run provisioning")
         for g in graph_list:
             self.initial_graph_placement(g)
         self.rebalance()
@@ -322,8 +360,14 @@ class TopologicalProvisioner(Provisioner):
         node.add_unscheduled_graph(g.copy(g.uuid))
 
     def rebalance(self) -> None:
-        while self.tree.step():
-            pass
+        count = 0
+        while True:
+            # print("rebalance round", count)
+            if not self.tree.step():
+                break
+            count += 1
+            if count > 20:
+                self.tree.debug = True
 
     def gather_scheduling_result(self, graph: ExecutionGraph) -> SchedulingResult:
         def gather_callback(vid: str, holder: typing.List):
@@ -339,6 +383,10 @@ class TopologicalProvisioner(Provisioner):
         for v in graph.get_vertices():
             holder = [None]
             self.tree.traversal(gather_callback(v.uuid, holder))
+            if holder[0] is None:
+                print(graph.uuid, v.uuid)
+                for k, node in self.tree.name_lookup_map.items():
+                    print(k, node.local_slots, node.node.occupied)
             assert holder[0] is not None
             result.assign(holder[0], v.uuid)
         return result

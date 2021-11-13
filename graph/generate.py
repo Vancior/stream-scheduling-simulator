@@ -16,6 +16,22 @@ default_parameter_range = {
 }
 
 
+class SourceSelector:
+    def __init__(self, sources: typing.Dict[str, int]):
+        self.sources = dict(sources)
+        self.total_slots = sum(sources.values())
+
+    def select(self) -> str:
+        idx = random.randint(0, self.total_slots - 1)
+        for k in random.sample(self.sources.keys(), len(self.sources)):
+            if idx < self.sources[k]:
+                self.sources[k] -= 1
+                self.total_slots -= 1
+                return k
+            idx -= self.sources[k]
+        assert False
+
+
 class GraphGenerator:
     def __init__(self, name: str, **kwargs) -> None:
         self.name = name
@@ -152,7 +168,7 @@ class GraphGenerator:
         node_vertex_map[0] = Vertex.from_spec(
             "{}-v{}".format(self.name, 0),
             "source",
-            {"host": random.choice(self.gen_args["source_hosts"])},
+            {"host": self.gen_args["source_hosts"].select()},
             0,
             0,
             self.gen_args["mi_cb"](),

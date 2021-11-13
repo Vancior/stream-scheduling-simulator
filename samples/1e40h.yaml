@@ -1,0 +1,99 @@
+domains:
+- type: cloud
+  name: cloud0
+  router:
+    bd: 1000
+    delay: 1
+  hrgs:
+  - name: cloud
+    replica: 1
+    spec:
+      mips: 5000
+      cores: 100000
+      memory: 200000
+      labels:
+        machine: rack
+    switch:
+      bd: 1000
+      delay: 1
+- type: edge
+  name: edge0
+  router:
+    bd: 101
+    delay: 1
+  hrgs:
+  - name: e0rasp
+    replica: 8
+    spec:
+      mips: 2000
+      cores: 2
+      memory: 4
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+  - name: e0vm
+    replica: 8
+    spec:
+      mips: 4000
+      cores: 4
+      memory: 8
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+  - name: e0desktop
+    replica: 4
+    spec:
+      mips: 4000
+      cores: 8
+      memory: 16
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+- type: edge
+  name: edge1
+  router:
+    bd: 200
+    delay: 1
+  hrgs:
+  - name: e1rasp
+    replica: 8
+    spec:
+      mips: 2000
+      cores: 2
+      memory: 4
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+  - name: e1vm
+    replica: 8
+    spec:
+      mips: 4000
+      cores: 4
+      memory: 8
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+  - name: e1desktop
+    replica: 4
+    spec:
+      mips: 4000
+      cores: 8
+      memory: 16
+      labels:
+        machine: rack
+    switch:
+      bd: 100
+      delay: 2
+interdomain:
+  bd: 300
+  delay: 20
