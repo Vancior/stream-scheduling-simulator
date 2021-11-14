@@ -7,4 +7,6 @@ def bd_calc(g: ExecutionGraph, s_cut: typing.Set[str], t_cut: typing.Set[str]) -
     for u, v, data in g.get_edges():
         if u in s_cut and v in t_cut:
             total_bd += data["unit_size"] * data["per_second"]
+        if u in t_cut and v in s_cut:
+            total_bd += data["unit_size"] * data["per_second"]
     return total_bd

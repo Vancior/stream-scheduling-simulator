@@ -147,6 +147,7 @@ class GraphGenerator:
         node_seq_num = 1
         node_rank_map[0] = 0
         edges = []
+        node_successor_cnt = defaultdict(int)
         for rank in range(1, total_rank):
             cur_node_cnt = random.randint(1, max_node_per_rank)
             cur_nodes = [node_seq_num + i for i in range(cur_node_cnt)]
@@ -154,8 +155,11 @@ class GraphGenerator:
             for node in cur_nodes:
                 node_rank_map[node] = rank
                 pre_cnt = random.randint(1, max_predecessors)
-                for pre_node in self.dag_select_predecessors(ranked_nodes, pre_cnt):
+                for pre_node in self.dag_select_predecessors(
+                    ranked_nodes, pre_cnt, node_successor_cnt
+                ):
                     edges.append((pre_node, node))
+                    node_successor_cnt[pre_node] += 1
                     # print("{} ---> {}".format(pre_node, node))
             ranked_nodes.append(cur_nodes)
 
@@ -205,15 +209,29 @@ class GraphGenerator:
 
     @classmethod
     def dag_select_predecessors(
-        cls, nodes: typing.List[typing.List[int]], cnt: int
+        cls,
+        nodes: typing.List[typing.List[int]],
+        cnt: int,
+        node_successor_cnt: typing.Dict[int, int],
     ) -> typing.List[int]:
         selected = []
         quota = cnt
         lv = len(nodes) - 1
         while lv >= 0:
-            sample_cnt = min(random.randint(0, quota), len(nodes[lv]))
+            sample_set = [n for n in nodes[lv] if node_successor_cnt[n] == 0]
+            sample_cnt = min(random.randint(0, quota), len(sample_set))
             quota -= sample_cnt
-            for sample in random.sample(nodes[lv], sample_cnt):
+            for sample in random.sample(sample_set, sample_cnt):
+                selected.append(sample)
+            if quota == 0:
+                break
+            lv -= 1
+        lv = len(nodes) - 1
+        while lv >= 0:
+            sample_set = [n for n in nodes[lv] if node_successor_cnt[n] > 0]
+            sample_cnt = min(random.randint(0, quota), len(sample_set))
+            quota -= sample_cnt
+            for sample in random.sample(sample_set, sample_cnt):
                 selected.append(sample)
             if quota == 0:
                 break
