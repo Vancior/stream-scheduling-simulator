@@ -36,14 +36,14 @@ def greedy_cut(
         s_cut_list = [set() for _ in sg_list]
         for sg_idx, sg in enumerate(sg_list):
             for v in sg.g.get_sources():
+                big_g.add_node(v.uuid, in_bd=0, sg_idx=sg_idx)
                 s_cut_list[sg_idx].add(v.uuid)
-            for v in sg.g.get_operators():
+            for v in sg.g.get_operators() + sg.g.get_sinks():
                 big_g.add_node(v.uuid, in_bd=0, sg_idx=sg_idx)
-            for v in sg.g.get_sinks():
-                big_g.add_node(v.uuid, in_bd=0, sg_idx=sg_idx)
-            for _, v, data in sg.g.get_edges():
+            for u, v, data in sg.g.get_edges():
+                big_g.add_edge(u, v)
                 big_g.nodes[v]["in_bd"] += data["unit_size"] * data["per_second"]
-            for v in sg.g.get_sinks():
+            for v in sg.g.get_sinks() + sg.g.get_sources():
                 big_g.remove_node(v.uuid)
 
         free_slots = sum(
@@ -97,6 +97,7 @@ def greedy_cut2(
             for v in sg.g.get_sources():
                 s_cut_list[sg_idx].add(v.uuid)
             for u, v, data in sg.g.get_edges():
+                big_g.add_edge(u, v)
                 big_g.nodes[v]["in_bd"] += data["unit_size"] * data["per_second"]
                 big_g.nodes[u]["out_bd"] += data["unit_size"] * data["per_second"]
             for v in sg.g.get_sources():
@@ -118,6 +119,7 @@ def greedy_cut2(
             if len(ingress_nodes) == 0:
                 break
             max_node, max_diff = max(ingress_nodes, key=lambda i: i[1])
+            # logger.info("%s %f", max_node, max_diff)
             if max_diff < 0:
                 break
             s_cut_list[big_g.nodes[max_node]["sg_idx"]].add(max_node)
