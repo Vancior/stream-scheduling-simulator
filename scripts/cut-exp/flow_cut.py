@@ -1,9 +1,11 @@
 import logging
+import os
+import sys
 import typing
 from collections import defaultdict
 
 import coloredlogs
-from algo import min_cut
+from algo import min_cut, min_cut2
 from graph import ExecutionGraph
 from topo import Domain, Scenario
 from utils import gen_uuid, grouped_exactly_one_binpack
@@ -112,16 +114,31 @@ class CutOption(typing.NamedTuple):
 
 def gen_cut_options(g: ExecutionGraph) -> typing.List[CutOption]:
     options: typing.List[CutOption] = []
-    s_cut, t_cut = min_cut(g)
-    flow = cross_bd(g, s_cut, t_cut)
-    options.append(CutOption(s_cut, t_cut, flow))
-
-    while len(s_cut) > 1:
-        sub_graph = g.sub_graph(s_cut, gen_uuid())
-        s_cut, _ = min_cut(sub_graph)
-        t_cut = set([v.uuid for v in g.get_vertices()]) - s_cut
+    try:
+        # s_cut, t_cut = min_cut(g)
+        s_cut, t_cut = min_cut2(g)
         flow = cross_bd(g, s_cut, t_cut)
         options.append(CutOption(s_cut, t_cut, flow))
+        # print(s_cut, t_cut)
+        round = 0
+        while len(s_cut) > 1:
+            sub_graph = g.sub_graph(s_cut, gen_uuid())
+            # s_cut, _ = min_cut(sub_graph)
+            s_cut, _ = min_cut2(sub_graph)
+            t_cut = set([v.uuid for v in g.get_vertices()]) - s_cut
+            flow = cross_bd(g, s_cut, t_cut)
+            options.append(CutOption(s_cut, t_cut, flow))
+            # print(s_cut, t_cut)
+            round += 1
+            if round > 100:
+                # with open("debug/g1.yaml", "w") as f:
+                #     ExecutionGraph.save_all([g], f)
+                raise RuntimeError("too many rounds")
+                sys.exit()
+    except Exception as e:
+        with open("debug/g3.yaml", "w") as f:
+            ExecutionGraph.save_all([g], f)
+        raise e
 
     return options
 

@@ -391,6 +391,19 @@ class TopologicalProvisioner(Provisioner):
             result.assign(holder[0], v.uuid)
         return result
 
+    def delete_graph(self, graph: ExecutionGraph):
+        vertices_set = set([v.uuid for v in graph.get_vertices()])
+
+        def delete_callback(node: ProvisionNode):
+            pre_len = len(node.scheduled_vertices)
+            node.scheduled_vertices = [
+                v for v in node.scheduled_vertices if v.uuid not in vertices_set
+            ]
+            post_len = len(node.scheduled_vertices)
+            node.slot_diff += pre_len - post_len
+
+        self.tree.traversal(delete_callback)
+
     def build_provisioner_tree(self) -> ProvisionTree:
         router_node = ProvisionNode(
             self.domain.router.name, "router", self.domain.router.node, None

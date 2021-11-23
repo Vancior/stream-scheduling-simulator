@@ -2,7 +2,7 @@ import random
 import typing
 from collections import defaultdict
 
-from algo import min_cut, cross_bd
+from algo import min_cut, min_cut2, cross_bd
 from graph import ExecutionGraph
 from topo import Domain, Scenario
 from utils import gen_uuid, grouped_exactly_one_binpack
@@ -205,13 +205,15 @@ class CutOption(typing.NamedTuple):
 
 def gen_cut_options(g: ExecutionGraph) -> typing.List[CutOption]:
     options: typing.List[CutOption] = []
-    s_cut, t_cut = min_cut(g)
+    # s_cut, t_cut = min_cut(g)
+    s_cut, t_cut = min_cut2(g)
     flow = cross_bd(g, s_cut, t_cut)
     options.append(CutOption(s_cut, t_cut, flow))
 
     while len(s_cut) > 1:
         sub_graph = g.sub_graph(s_cut, gen_uuid())
-        s_cut, _ = min_cut(sub_graph)
+        # s_cut, _ = min_cut(sub_graph)
+        s_cut, _ = min_cut2(sub_graph)
         t_cut = set([v.uuid for v in g.get_vertices()]) - s_cut
         flow = cross_bd(g, s_cut, t_cut)
         options.append(CutOption(s_cut, t_cut, flow))

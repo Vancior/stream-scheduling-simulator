@@ -72,19 +72,19 @@ class ExecutionGraph:
     def get_edges(self):
         return self.g.edges(data=True)
 
-    def get_sources(self):
+    def get_sources(self) -> typing.List[Vertex]:
         return [v for v in self.get_vertices() if v.type == "source"]
 
-    def get_sinks(self):
+    def get_sinks(self) -> typing.List[Vertex]:
         return [v for v in self.get_vertices() if v.type == "sink"]
 
-    def get_operators(self):
+    def get_operators(self) -> typing.List[Vertex]:
         return [v for v in self.get_vertices() if v.type == "operator"]
 
-    def get_in_vertices(self):
+    def get_in_vertices(self) -> typing.List[Vertex]:
         return [v for v in self.get_vertices() if self.g.in_degree(v.uuid) == 0]
 
-    def get_out_vertices(self):
+    def get_out_vertices(self) -> typing.List[Vertex]:
         return [v for v in self.get_vertices() if self.g.out_degree(v.uuid) == 0]
 
     def topological_order(self) -> typing.List[Vertex]:

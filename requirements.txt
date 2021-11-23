@@ -1,6 +1,9 @@
+black
 blackcellmagic
 coloredlogs
+jupyter
+matplotlib
 networkx
-notebook
 numpy
 pyyaml
+tqdm

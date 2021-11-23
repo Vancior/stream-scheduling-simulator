@@ -1,0 +1,144 @@
+uuid: f1
+vertices:
+  f1-v1:
+    domain_constraint:
+      host: vm1
+    upstream_bd: 0
+    downstream_bd: 7605
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+  f1-v2:
+    domain_constraint: {}
+    upstream_bd: 7605
+    downstream_bd: 2361
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f1-v3:
+    domain_constraint: {}
+    upstream_bd: 2361
+    downstream_bd: 2390
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f1-v4:
+    domain_constraint: {}
+    upstream_bd: 2390
+    downstream_bd: 2410
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f1-v5:
+    domain_constraint: {}
+    upstream_bd: 2410
+    downstream_bd: 36
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f1-v6:
+    domain_constraint:
+      host: cloud1
+    upstream_bd: 36
+    downstream_bd: 0
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: sink
+edges:
+- data:
+    per_second: 1
+    unit_size: 7605
+  from: f1-v1
+  to: f1-v2
+- data:
+    per_second: 1
+    unit_size: 2361
+  from: f1-v2
+  to: f1-v3
+- data:
+    per_second: 1
+    unit_size: 2390
+  from: f1-v3
+  to: f1-v4
+- data:
+    per_second: 1
+    unit_size: 2410
+  from: f1-v4
+  to: f1-v5
+- data:
+    per_second: 1
+    unit_size: 36
+  from: f1-v5
+  to: f1-v6
+---
+uuid: f2
+vertices:
+  f2-v1:
+    domain_constraint:
+      host: vm1
+    upstream_bd: 0
+    downstream_bd: 7613
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: source
+  f2-v2:
+    domain_constraint: {}
+    upstream_bd: 7613
+    downstream_bd: 2954
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f2-v3:
+    domain_constraint: {}
+    upstream_bd: 2954
+    downstream_bd: 3510
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f2-v4:
+    domain_constraint: {}
+    upstream_bd: 3510
+    downstream_bd: 50
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: operator
+  f2-v5:
+    domain_constraint:
+      host: cloud1
+    upstream_bd: 50
+    downstream_bd: 0
+    memory: 200000000
+    mi: 1
+    out_unit_size: 0
+    type: sink
+edges:
+- data:
+    per_second: 1
+    unit_size: 7613
+  from: f2-v1
+  to: f2-v2
+- data:
+    per_second: 1
+    unit_size: 2954
+  from: f2-v2
+  to: f2-v3
+- data:
+    per_second: 1
+    unit_size: 3510
+  from: f2-v3
+  to: f2-v4
+- data:
+    per_second: 1
+    unit_size: 50
+  from: f2-v4
+  to: f2-v5

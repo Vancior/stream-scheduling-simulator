@@ -42,7 +42,9 @@ def best_cut(
         )
         output = result.stdout.decode("ASCII")
         solution = output.split("\n")[-3].strip().split(" ")
-        assert len(solution) == sum([sg.g.number_of_vertices() for sg in sg_list])
+        if len(solution) != sum([sg.g.number_of_vertices() for sg in sg_list]):
+            print(output)
+            raise RuntimeError("unexpected output")
         for idx, s in enumerate(solution):
             sg_idx = index_op_map[idx][1]
             vid = index_op_map[idx][0]
@@ -86,7 +88,7 @@ def gen_data_file(
             v_idx = op_index_map[v]
             bd = data["unit_size"] * data["per_second"]
             flow_matrix[u_idx][v_idx] = bd
-            # flow_matrix[u_idx][v_idx] = bd
+            # flow_matrix[v_idx][u_idx] = bd
 
     f.write("data;\n")
     f.write("param n := {} ;\n".format(num_op))
