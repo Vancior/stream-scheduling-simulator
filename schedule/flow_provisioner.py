@@ -7,7 +7,7 @@ from functools import reduce
 
 from graph import ExecutionGraph, Vertex
 from topo import Domain, Host, Node, Topology
-from utils import gen_uuid, get_logger, grouped_exactly_one_binpack
+from utils import gen_uuid, get_logger, grouped_exactly_one_full_binpack
 
 from .provision import Provisioner
 from .result import SchedulingResult
@@ -155,7 +155,7 @@ class ProvisionNode:
             + [(len(vs), vs[len(vs) - 1].downstream_bd)]
             for vs in topological_sorted_graphs
         ]
-        solution = grouped_exactly_one_binpack(n_slot, groups)
+        solution = grouped_exactly_one_full_binpack(n_slot, groups)
         for g_idx, s_idx in enumerate(solution):
             v_count = groups[g_idx][s_idx][0]
             for vidx in range(v_count):
@@ -223,7 +223,7 @@ class ProvisionNode:
                 + [(len(vs), vs[len(vs) - 1].downstream_bd)]
                 for vs in topological_sorted_graphs
             ]
-            solution = grouped_exactly_one_binpack(child_slots, groups)
+            solution = grouped_exactly_one_full_binpack(child_slots, groups)
             for graph, vertices, group, s_idx in zip(
                 self.unscheduled_graphs, topological_sorted_graphs, groups, solution
             ):

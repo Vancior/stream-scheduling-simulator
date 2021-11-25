@@ -112,14 +112,16 @@ def constrained_balance(
         t = parent_child_map[k]
         for v in graph.get_up_vertices(k):
             e = graph.get_edge(v.uuid, k)
-            t.parents.append(
-                (v.uuid, math.sqrt(e["unit_size"] * e["per_second"] / max_bd))
-            )
+            t.parents.append((v.uuid, e["unit_size"] * e["per_second"] / max_bd))
+            # t.parents.append(
+            #     (v.uuid, math.sqrt(e["unit_size"] * e["per_second"] / max_bd))
+            # )
         for v in graph.get_down_vertices(k):
             e = graph.get_edge(k, v.uuid)
-            t.children.append(
-                (v.uuid, math.sqrt(e["unit_size"] * e["per_second"] / max_bd))
-            )
+            t.children.append((v.uuid, e["unit_size"] * e["per_second"] / max_bd))
+            # t.children.append(
+            #     (v.uuid, math.sqrt(e["unit_size"] * e["per_second"] / max_bd))
+            # )
 
     coords = {k: v for k, v in coords.items()}
     keys = list(coords.keys())

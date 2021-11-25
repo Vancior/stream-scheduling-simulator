@@ -57,7 +57,7 @@ class DisjointSet:
         return set(self.roots)
 
 
-def grouped_exactly_one_binpack(
+def grouped_exactly_one_nonfull_binpack(
     n_slot: int, groups: typing.List[typing.List[typing.Tuple[int, int]]]
 ) -> typing.List[int]:
     """arguments:
@@ -85,7 +85,46 @@ def grouped_exactly_one_binpack(
                     selected[capacity] = gid + 1
                     choices[gid, capacity] = eid
     valid_idx = np.where(selected == len(groups))[0]
-    backtrace = valid_idx[-1]
+    backtrace = valid_idx[np.argmin(dp[valid_idx])]
+    solution: typing.List[int] = [None for _ in range(len(groups))]
+    for gid in range(len(groups) - 1, -1, -1):
+        assert choices[gid, backtrace] >= 0
+        solution[gid] = choices[gid, backtrace]
+        backtrace -= groups[gid][solution[gid]][0]
+    return solution
+
+
+def grouped_exactly_one_full_binpack(
+    n_slot: int, groups: typing.List[typing.List[typing.Tuple[int, int]]]
+) -> typing.List[int]:
+    """arguments:
+    n_slot -- binpack capacity
+    groups -- list of groups, each contains a list of (volume, value) pairs
+    """
+    dp = np.full((n_slot + 1,), MAX, dtype=np.int64)
+    selected = np.full((n_slot + 1,), -1, dtype=np.int32)
+    selected[0] = 0
+    choices = np.full((len(groups), n_slot + 1), -1, dtype=np.int32)
+    dp[0] = 0
+    for gid, group in enumerate(groups):
+        for capacity in range(n_slot, -1, -1):
+            for eid, ele in enumerate(group):
+                volume, value = ele
+                if capacity < volume:
+                    continue
+                # NOTE only when previous groups are selected
+                # NOTE if selected[capacity] not be overwrited at this round, it cannot be used at next round
+                if selected[capacity - volume] == gid and (
+                    dp[capacity - volume] + value < dp[capacity]
+                    or selected[capacity] <= gid
+                ):
+                    dp[capacity] = dp[capacity - volume] + value
+                    selected[capacity] = gid + 1
+                    choices[gid, capacity] = eid
+    # valid_idx = np.where(selected == len(groups))[0]
+    assert selected[n_slot] == len(groups)
+    backtrace = n_slot
+    # backtrace = valid_idx[-1]
     solution: typing.List[int] = [None for _ in range(len(groups))]
     for gid in range(len(groups) - 1, -1, -1):
         assert choices[gid, backtrace] >= 0

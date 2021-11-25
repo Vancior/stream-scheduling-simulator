@@ -5,7 +5,7 @@ from collections import defaultdict
 from algo import min_cut, min_cut2, cross_bd
 from graph import ExecutionGraph
 from topo import Domain, Scenario
-from utils import gen_uuid, grouped_exactly_one_binpack
+from utils import gen_uuid, grouped_exactly_one_nonfull_binpack
 
 from .flow_provisioner import TopologicalProvisioner
 from .provision import Provisioner
@@ -185,7 +185,8 @@ class FlowScheduler(Scheduler):
                 [(len(option.s_cut), option.flow) for option in options]
                 for options in graph_cut_options
             ]
-            solution = grouped_exactly_one_binpack(free_slots, groups)
+            # solution = grouped_exactly_one_binpack(free_slots, groups)
+            solution = grouped_exactly_one_nonfull_binpack(free_slots, groups)
             s_graph_list: typing.List[ExecutionGraph] = [
                 sg.g.sub_graph(options[s_idx].s_cut, gen_uuid())
                 for sg, options, s_idx in zip(sg_list, graph_cut_options, solution)
